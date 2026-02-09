@@ -5,6 +5,7 @@ This repository contains the infrastructure, configuration, and documentation fo
 ## Documentation
 
 - `docs/README.md`
+- Reproduction runbook: `docs/reproduce.md`
 
 ## Key Artifacts
 

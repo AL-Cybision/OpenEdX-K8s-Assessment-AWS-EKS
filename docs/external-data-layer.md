@@ -40,6 +40,12 @@ No resource names are assumed.
 
 ## Deploy (Terraform)
 
+Use the script for deterministic plan/apply:
+```bash
+infra/terraform/apply.sh
+```
+
+Equivalent manual commands:
 ```bash
 ./infra/terraform_executable -chdir=infra/terraform init -input=false
 ./infra/terraform_executable -chdir=infra/terraform plan -input=false -out tfplan

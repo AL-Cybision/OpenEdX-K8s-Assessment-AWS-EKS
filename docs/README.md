@@ -12,3 +12,4 @@
 - `docs/architecture.md` — Architecture + network flow diagrams
 - `docs/troubleshooting.md` — Common issues and fixes
 - `docs/decisions.md` — Configuration decisions and rationale
+- `docs/reproduce.md` — Assessor-friendly reproduction runbook (script-driven)

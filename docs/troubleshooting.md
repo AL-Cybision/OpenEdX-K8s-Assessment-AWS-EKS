@@ -35,3 +35,22 @@ kubectl -n kube-system get deploy metrics-server
 ## CloudFront returns 404
 - Cause: CloudFront default domain (e.g. `d123.cloudfront.net`) doesn't match the NGINX Ingress host rules (`lms.openedx.local`, `studio.openedx.local`), so NGINX returns 404/400.
 - Fix (production): use a real domain and configure CloudFront alternate domain + certificate to match your Tutor/Ingress hosts.
+
+## EFS Terraform OIDC error (media-efs)
+- Symptom: Terraform fails with `expected "url" to have a host, got oidc.eks...`
+- Cause: The IAM OIDC provider data source expects a full issuer URL (including `https://`).
+- Fix: `infra/media-efs/data-sources.tf` uses the EKS issuer URL directly (do not strip `https://`).
+
+## Grafana port-forward "connection refused"
+- Symptom: `kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80` fails with `connect: connection refused`.
+- Checks:
+```bash
+kubectl -n observability get pods -l app.kubernetes.io/name=grafana
+kubectl -n observability get svc kube-prometheus-stack-grafana -o wide
+kubectl -n observability describe pod -l app.kubernetes.io/name=grafana | rg -n "Ready|Readiness|Liveness|Events" || true
+```
+- Fix: wait for the Grafana pod to become Ready, then retry port-forward. If service forwarding still fails, port-forward a specific pod:
+```bash
+POD=$(kubectl -n observability get pods -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
+kubectl -n observability port-forward "pod/${POD}" 3000:3000
+```
