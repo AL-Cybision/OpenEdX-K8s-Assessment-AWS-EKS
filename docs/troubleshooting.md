@@ -1,8 +1,154 @@
 # Troubleshooting Guide
 
-## Meilisearch PVC Pending
-- Cause: No default StorageClass.
-- Fix:
+This guide lists the highest-probability failures for this assessment and the fastest commands to diagnose them.
+
+## 1) Cannot Access LMS/CMS in Browser
+
+Symptoms:
+- Browser shows 404/502
+- CloudFront default domain returns 404
+
+Checks:
+```bash
+kubectl -n openedx-prod get pods
+kubectl -n openedx-prod get ingress openedx -o wide
+kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
+```
+
+Notes:
+- Ingress routes by `Host`. If you curl the NLB hostname without a matching `Host` header, NGINX will return 404.
+
+Test directly against the NLB (replace `NLB_HOSTNAME`):
+```bash
+NLB_HOSTNAME=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+curl -k -sSI -H 'Host: lms.openedx.local' "https://${NLB_HOSTNAME}/"
+curl -k -sSI -H 'Host: studio.openedx.local' "https://${NLB_HOSTNAME}/"
+```
+
+CloudFront note:
+- `https://<cloudfront>.net/` may return 404 because `Host` does not match the Ingress rules. WAF proof is independent of routing.
+
+## 2) Pods Stuck Pending
+
+Most common causes:
+- Not enough nodes or node resources (CPU/memory)
+- PVC not bound
+
+Checks:
+```bash
+kubectl -n openedx-prod get pods -o wide
+kubectl -n openedx-prod describe pod <POD_NAME>
+kubectl get nodes
+kubectl -n openedx-prod get pvc
+```
+
+If scale is required:
+```bash
+eksctl get nodegroup --cluster openedx-eks --region us-east-1
+```
+
+## 3) HPA Not Scaling
+
+Requirements:
+- metrics-server must be running
+- deployments must have CPU requests (HPA needs utilization percentage)
+
+Checks:
+```bash
+kubectl -n kube-system get deploy metrics-server
+kubectl -n openedx-prod get hpa
+kubectl -n openedx-prod describe hpa lms-hpa
+kubectl -n openedx-prod describe deploy lms | rg -n "Requests:|Limits:" || true
+```
+
+Fix (re-apply requests/limits + HPAs):
+```bash
+infra/k8s/05-hpa/apply.sh
+```
+
+## 4) External DB Connectivity Fails From Pods
+
+Symptoms:
+- LMS/CMS crashloop
+- workers failing to connect to Redis
+
+Fast connectivity probe from inside EKS:
+```bash
+RDS_ENDPOINT=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_endpoint)
+MONGO_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw mongo_private_ip)
+REDIS_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw redis_private_ip)
+ES_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw elasticsearch_private_ip)
+
+kubectl -n openedx-prod run verify-net --rm -it --image=alpine:3.20 -- sh -c "\
+apk add --no-cache busybox-extras curl >/dev/null; \
+nc -vz ${RDS_ENDPOINT} 3306; \
+nc -vz ${MONGO_IP} 27017; \
+nc -vz ${REDIS_IP} 6379; \
+nc -vz ${ES_IP} 9200; \
+curl -sS http://${ES_IP}:9200/ | head -n 1"
+```
+
+If `nc` fails:
+- verify SG rules allow inbound from the worker SG
+- verify instances are in private subnets in the same VPC as EKS
+
+## 5) Redis Auth Errors (Workers CrashLoop)
+
+Cause:
+- password contains special characters and must be URL-encoded
+- Tutor may omit auth unless `REDIS_USERNAME` is set
+
+Fix:
+- URL-encode the Redis password before saving Tutor config
+- set `REDIS_USERNAME=default`
+
+See: `docs/tutor-k8s.md` (Redis URL encoding + username notes).
+
+## 6) Elasticsearch Not Healthy / Connection Refused
+
+Common causes:
+- `vm.max_map_count` not set
+- heap too large for the instance
+
+Checks on EC2:
+```bash
+sudo sysctl vm.max_map_count
+sudo ls -la /etc/elasticsearch/jvm.options.d/
+sudo systemctl status elasticsearch --no-pager
+sudo journalctl -u elasticsearch -n 200 --no-pager
+```
+
+Expected:
+- `vm.max_map_count=262144`
+- heap options set (512m-1g range depending on RAM)
+
+## 7) EFS Media Mount Issues (openedx-media)
+
+Symptoms:
+- LMS/CMS pods fail to start with mount errors
+- `openedx-media` PVC stays Pending
+
+Checks:
+```bash
+aws eks list-addons --cluster-name openedx-eks --region us-east-1 --output table
+kubectl -n kube-system get pods | rg -i "efs|csi" || true
+kubectl -n openedx-prod get pvc openedx-media -o wide
+kubectl describe pv openedx-media-efs
+```
+
+Network requirement:
+- NFS 2049/tcp from worker SG to EFS SG must be allowed.
+
+OIDC Terraform error (media-efs):
+- Symptom: `expected "url" to have a host, got oidc.eks...`
+- Fix: `infra/media-efs/data-sources.tf` must use the full issuer URL (do not strip `https://`).
+
+## 8) Meilisearch PVC Pending
+
+Cause:
+- no default StorageClass
+
+Fix:
 ```bash
 kubectl get storageclass
 kubectl get storageclass gp2 >/dev/null 2>&1 && \
@@ -12,45 +158,30 @@ kubectl -n openedx-prod delete pvc meilisearch
 infra/k8s/04-tutor-apply/apply.sh
 ```
 
-## LMS/CMS Workers CrashLoop (Redis password)
-- Cause: Redis password contains special chars (needs URL encoding), or Tutor doesn't include auth in rendered URLs unless a username is set.
-- Fix:
-  - URL‑encode the Redis password before saving Tutor config.
-  - Set `REDIS_USERNAME=default` (Redis ACL default user + `requirepass`).
+## 9) Grafana Port-Forward Fails (Connection Refused)
 
-## Elasticsearch fails to start
-- Cause: `vm.max_map_count` not set or incorrect data/log paths.
-- Fix: Ensure `vm.max_map_count=262144` and data/log paths are writable (handled in user-data).
-
-## Caddy reappears after `tutor k8s start`
-- Fix: Always use `infra/k8s/04-tutor-apply/apply.sh`.
-
-## HPA not scaling
-- Check metrics-server:
-```bash
-kubectl -n kube-system get deploy metrics-server
-```
-- Confirm CPU requests/limits set on LMS/CMS.
-
-## CloudFront returns 404
-- Cause: CloudFront default domain (e.g. `d123.cloudfront.net`) doesn't match the NGINX Ingress host rules (`lms.openedx.local`, `studio.openedx.local`), so NGINX returns 404/400.
-- Fix (production): use a real domain and configure CloudFront alternate domain + certificate to match your Tutor/Ingress hosts.
-
-## EFS Terraform OIDC error (media-efs)
-- Symptom: Terraform fails with `expected "url" to have a host, got oidc.eks...`
-- Cause: The IAM OIDC provider data source expects a full issuer URL (including `https://`).
-- Fix: `infra/media-efs/data-sources.tf` uses the EKS issuer URL directly (do not strip `https://`).
-
-## Grafana port-forward "connection refused"
-- Symptom: `kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80` fails with `connect: connection refused`.
-- Checks:
+Checks:
 ```bash
 kubectl -n observability get pods -l app.kubernetes.io/name=grafana
 kubectl -n observability get svc kube-prometheus-stack-grafana -o wide
-kubectl -n observability describe pod -l app.kubernetes.io/name=grafana | rg -n "Ready|Readiness|Liveness|Events" || true
 ```
-- Fix: wait for the Grafana pod to become Ready, then retry port-forward. If service forwarding still fails, port-forward a specific pod:
+
+Fix:
+- wait for Grafana pod Ready then retry port-forward
+- if service port-forward still fails, forward the pod
+
 ```bash
 POD=$(kubectl -n observability get pods -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
 kubectl -n observability port-forward "pod/${POD}" 3000:3000
+```
+
+## 10) CloudFront/WAF Proof Not Working
+
+Expected:
+- normal request: non-403 (often 404 due to host mismatch)
+- blocked request: HTTP/2 403 when `X-Block-Me: 1` is present
+
+Verify:
+```bash
+infra/cloudfront-waf/verify.sh
 ```
