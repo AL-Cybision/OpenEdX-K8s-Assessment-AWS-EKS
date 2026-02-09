@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: openedx-prod-rules
+  namespace: observability
+  labels:
+    release: kube-prometheus-stack
+    app.kubernetes.io/instance: kube-prometheus-stack
+spec:
+  groups:
+    - name: openedx-prod.rules
+      rules:
+        - alert: OpenedxDeploymentReplicasMismatch
+          expr: |
+            (
+              kube_deployment_spec_replicas{namespace="openedx-prod",deployment=~"lms|cms"}
+              -
+              kube_deployment_status_replicas_available{namespace="openedx-prod",deployment=~"lms|cms"}
+            ) > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Open edX deployment replicas mismatch"
+            description: "Deployment {{ $labels.deployment }} has missing replicas for >5m."
+        - alert: OpenedxHpaAtMaxReplicas
+          expr: |
+            kube_horizontalpodautoscaler_status_current_replicas{namespace="openedx-prod",horizontalpodautoscaler=~"lms-hpa|cms-hpa"}
+            >=
+            kube_horizontalpodautoscaler_spec_max_replicas{namespace="openedx-prod",horizontalpodautoscaler=~"lms-hpa|cms-hpa"}
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Open edX HPA at max replicas"
+            description: "{{ $labels.horizontalpodautoscaler }} is at max replicas for >10m (node capacity or maxReplicas may need adjustment)."
+        - alert: OpenedxPodsNotReady
+          expr: |
+            sum(kube_pod_status_ready{namespace="openedx-prod",condition="false"}) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pods not Ready in openedx-prod"
+            description: "One or more pods have been NotReady for >10m in namespace openedx-prod."
+

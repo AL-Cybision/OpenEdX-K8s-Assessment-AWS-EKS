@@ -6,6 +6,7 @@ This project uses AWS-native snapshots for a **low-cost, minimal** backup strate
 
 Script:
 - `infra/backups/backup.sh`
+- `infra/backups/restore.sh` (restore helper; dry-run by default)
 
 What it does:
 - Creates a **manual RDS snapshot** for MySQL.
@@ -37,6 +38,25 @@ aws efs put-backup-policy --region us-east-1 --file-system-id "$EFS_ID" --backup
 ```
 
 ## Restore (High-Level)
+
+## Restore (Scripts)
+
+Restore helper script:
+- `infra/backups/restore.sh`
+
+Safety:
+- This script is **dry-run by default**.
+- To actually create restore resources, set: `CONFIRM_RESTORE=YES`
+
+RDS restore (restores a new DB instance from the latest manual snapshot):
+```bash
+infra/backups/restore.sh rds
+```
+
+Create EBS volume from snapshot (for EC2 volumes or EBS-backed PV restores):
+```bash
+infra/backups/restore.sh ebs-volume snap-0123456789abcdef0 us-east-1a
+```
 
 ### RDS
 1. Create new DB from snapshot in RDS console.

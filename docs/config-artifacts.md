@@ -100,3 +100,21 @@ Reproduction runbook:
 Evidence checklist (screenshots + terminal proof):
 - `docs/evidence-checklist.md`
 
+## Automation (Scripts)
+
+Deployment automation entrypoints:
+- `docs/reproduce.md` (end-to-end runbook)
+- `infra/terraform/apply.sh` (external data layer)
+- `infra/media-efs/apply.sh` (EFS media layer)
+- `infra/k8s/04-tutor-apply/apply.sh` (Tutor apply wrapper)
+- `infra/cloudfront-waf/apply.sh` (CloudFront + WAF)
+- `infra/observability/install.sh` (monitoring stack)
+
+Backup and restore:
+- `infra/backups/backup.sh`
+- `infra/backups/restore.sh`
+
+Monitoring and alerting configuration:
+- `infra/observability/values-kube-prometheus-stack.yaml` (Prometheus/Grafana + Alertmanager)
+- `infra/observability/values-loki-stack.yaml` (Loki/Promtail)
+- `infra/observability/openedx-prometheusrule.yaml` (custom alerts)

@@ -156,6 +156,11 @@ kubectl -n observability get pods
 
 Access steps and queries: `docs/observability.md`.
 
+Apply custom alerts (optional but included as an alerting configuration artifact):
+```bash
+infra/observability/apply-alerts.sh
+```
+
 ## 8) CloudFront + WAF
 
 ```bash

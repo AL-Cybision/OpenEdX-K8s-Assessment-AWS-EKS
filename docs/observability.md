@@ -47,3 +47,22 @@ Dashboard screenshot:
 Logs screenshot:
 - Grafana: `Explore` -> datasource `Loki` -> query: `{namespace="openedx-prod", pod=~"lms-.*"}`
 - If Explore shows `React Monaco Editor failed to load`, switch from `Code` to `Builder`.
+
+## Alerting Configuration
+
+Alertmanager:
+- Enabled via `infra/observability/values-kube-prometheus-stack.yaml` (`alertmanager.enabled: true`)
+
+Custom Prometheus alerts for `openedx-prod`:
+- `infra/observability/openedx-prometheusrule.yaml`
+
+Apply:
+```bash
+infra/observability/apply-alerts.sh
+```
+
+Verify:
+```bash
+kubectl -n observability get prometheusrule openedx-prod-rules -o yaml | head -n 80
+kubectl -n observability get --raw \"/api/v1/namespaces/observability/services/kube-prometheus-stack-prometheus:9090/proxy/api/v1/rules\" | jq '.data.groups[] | select(.name|test(\"openedx\"))'
+```
