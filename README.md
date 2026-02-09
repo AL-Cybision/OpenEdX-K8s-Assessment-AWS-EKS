@@ -15,6 +15,23 @@ This repository contains the infrastructure, configuration, and documentation fo
 - Media PV/PVC (EFS RWX): `infra/k8s/02-storage/openedx-media-efs.yaml`
 - Tutor apply wrapper (Caddy removal + probes + media mount): `infra/k8s/04-tutor-apply/apply.sh`
 
+## Step-by-Step Deployment Guide
+
+Primary runbook (script-driven):
+- `docs/reproduce.md`
+
+High-level execution order:
+1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
+2. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
+3. NGINX ingress controller: `infra/ingress-nginx/install.sh`
+4. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
+5. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
+6. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
+7. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+8. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
+9. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
+10. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
+
 ## Evidence Pack
 
 (Replace the TODO placeholders with links to screenshots saved in `docs/screenshots/`.)
