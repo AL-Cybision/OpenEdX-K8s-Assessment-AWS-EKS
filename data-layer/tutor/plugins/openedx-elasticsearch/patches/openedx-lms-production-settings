@@ -1,0 +1,5 @@
+# Enable Elasticsearch as the search backend
+MEILISEARCH_ENABLED = False
+SEARCH_ENGINE = "search.elastic.ElasticSearchEngine"
+ELASTIC_SEARCH_CONFIG = [{"hosts": ["http://192.168.70.129:9200"]}]
+ELASTIC_SEARCH_INDEX_PREFIX = "tutor_"

@@ -1,0 +1,15 @@
+.venv/
+.history/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Terraform (never commit state or local caches)
+**/.terraform/
+**/.terraform.lock.hcl~
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/*.tfstate
+**/*.tfstate.*
+**/tfplan
+**/*.tfplan

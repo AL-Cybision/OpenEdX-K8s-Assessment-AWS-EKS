@@ -1,0 +1,8 @@
+controller:
+  config:
+    use-http2: true
+  replicaCount: 2
+  service:
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    type: LoadBalancer
