@@ -8,6 +8,7 @@ Scope: you can use an **existing EKS cluster**, or create one using `eksctl` (in
 
 Required tools:
 - `aws`, `kubectl`, `helm`, `jq`, `python3`
+- Optional (for cluster creation): `eksctl`
 - Terraform: use `./infra/terraform_executable` (pinned binary in repo) or set `TF_BIN=/path/to/terraform`
 
 Verify AWS + cluster access:
@@ -26,6 +27,11 @@ infra/eksctl/create-cluster.sh
 ```
 
 If you already have a cluster, skip this.
+
+Destroy when finished:
+```bash
+infra/eksctl/delete-cluster.sh
+```
 
 ## 1) Namespaces
 
