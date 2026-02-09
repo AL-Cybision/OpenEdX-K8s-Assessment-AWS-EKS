@@ -1,3 +1,8 @@
+# NOTE: This EBS-based PVC is kept only as an early lab artifact.
+# For production-grade Open edX (multi-replica LMS/CMS + shared uploads/media),
+# EBS `ReadWriteOnce` is not suitable. Use the EFS-backed RWX media volume:
+# - `infra/media-efs/` (provisions EFS + EFS CSI driver)
+# - `infra/k8s/02-storage/openedx-media-efs.yaml` + `infra/k8s/02-storage/apply.sh`
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
