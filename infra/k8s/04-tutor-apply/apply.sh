@@ -6,7 +6,7 @@ set -euo pipefail
 
 TUTOR_BIN="${TUTOR_BIN:-.venv/bin/tutor}"
 NAMESPACE="${NAMESPACE:-openedx-prod}"
-TUTOR_ENV_DIR="${TUTOR_ENV_DIR:-/home/alcybision/.local/share/tutor/env}"
+TUTOR_ENV_DIR="${TUTOR_ENV_DIR:-${HOME}/.local/share/tutor/env}"
 
 "${TUTOR_BIN}" config save --env-only
 

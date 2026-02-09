@@ -1,0 +1,30 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: __CLUSTER_NAME__
+  region: __AWS_REGION__
+  version: "__K8S_VERSION__"
+
+availabilityZones:
+  - us-east-1a
+  - us-east-1c
+
+iam:
+  withOIDC: true
+
+vpc:
+  nat:
+    gateway: Single
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: false
+
+managedNodeGroups:
+  - name: ng-main
+    instanceType: t3.large
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 3
+    privateNetworking: true
+    volumeSize: 80

@@ -6,6 +6,7 @@ This repository contains the infrastructure, configuration, and documentation fo
 
 - `docs/README.md`
 - Reproduction runbook: `docs/reproduce.md`
+- Optional: cluster automation: `infra/eksctl/`
 
 ## Key Artifacts
 

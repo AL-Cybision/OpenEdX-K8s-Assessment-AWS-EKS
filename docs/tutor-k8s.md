@@ -94,7 +94,7 @@ Notes:
 MEILI_MASTER=$(python3 - <<'PY'
 import yaml
 from pathlib import Path
-cfg = Path('/home/alcybision/.local/share/tutor/config.yml').read_text()
+cfg = Path.home().joinpath('.local/share/tutor/config.yml').read_text()
 print(yaml.safe_load(cfg)['MEILISEARCH_MASTER_KEY'])
 PY
 )
@@ -160,8 +160,8 @@ Plugin file (source of truth):
 Install/enable the local plugin and re-apply:
 
 ```bash
-mkdir -p /home/alcybision/.local/share/tutor-plugins
-cp data-layer/tutor/plugins/openedx-elasticsearch.py /home/alcybision/.local/share/tutor-plugins/openedx-elasticsearch.py
+mkdir -p "${HOME}/.local/share/tutor-plugins"
+cp data-layer/tutor/plugins/openedx-elasticsearch.py "${HOME}/.local/share/tutor-plugins/openedx-elasticsearch.py"
 .venv/bin/tutor plugins enable openedx-elasticsearch
 .venv/bin/tutor k8s start
 ```

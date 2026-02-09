@@ -2,7 +2,7 @@
 
 This repo is structured so an assessor can reproduce the deployment by running the included scripts, then verify using the provided commands (no secrets printed).
 
-Scope: this runbook assumes an **existing EKS cluster** is available in `us-east-1` and `kubectl` is configured to talk to it.
+Scope: you can use an **existing EKS cluster**, or create one using `eksctl` (included below). Creating EKS resources costs money; delete the cluster when finished.
 
 ## 0) Prereqs (Local)
 
@@ -16,6 +16,16 @@ aws sts get-caller-identity
 aws eks describe-cluster --name openedx-eks --region us-east-1 --query 'cluster.status' --output text
 kubectl get ns
 ```
+
+## 0.1) Optional: Create the EKS Cluster (eksctl)
+
+Cost note: this creates a VPC + a NAT gateway + 2 managed worker nodes, so charges start immediately.
+
+```bash
+infra/eksctl/create-cluster.sh
+```
+
+If you already have a cluster, skip this.
 
 ## 1) Namespaces
 
@@ -160,4 +170,3 @@ EFS media backup strategy: `docs/backup-restore.md`.
 
 Follow the ordered checklist:
 - `docs/evidence-checklist.md`
-
