@@ -20,6 +20,13 @@ This repository contains the infrastructure, configuration, and documentation fo
 Primary runbook (script-driven):
 - `docs/reproduce.md`
 
+## Known Limitations (Assessment Setup)
+
+- Domains are placeholders: `lms.openedx.local`, `studio.openedx.local` (no real DNS).
+- TLS uses a self-signed certificate for these placeholder domains (satisfies “TLS termination at NGINX” for the assessment).
+- CloudFront default domain requests may return 404 because NGINX routes by `Host`. The WAF proof (HTTP/2 403 with `X-Block-Me: 1`) is independent of host routing.
+- EKS API endpoint is public for reproducibility; a real production environment should restrict CIDRs or use private endpoint access.
+
 High-level execution order:
 1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
 2. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`

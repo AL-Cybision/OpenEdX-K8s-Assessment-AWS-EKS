@@ -85,6 +85,25 @@ Ports (high-level):
 - Pods -> Elasticsearch: 9200/tcp
 - Pods -> EFS mount targets: 2049/tcp
 
+## Ports and Access Matrix
+
+This table summarizes the minimum required network paths for the deployment.
+
+| From | To | Port | Why |
+|---|---|---:|---|
+| Internet | CloudFront | 443 | public entrypoint |
+| CloudFront | NLB (ingress-nginx) | 443 | edge to origin |
+| NLB | NGINX Ingress Controller pods | 443/80 | TLS termination + routing |
+| NGINX Ingress | LMS/CMS services | 8000 | app traffic |
+| LMS/CMS/Workers pods | RDS MySQL | 3306 | relational DB |
+| LMS/CMS/Workers pods | MongoDB EC2 | 27017 | document store |
+| LMS/CMS/Workers pods | Redis EC2 | 6379 | cache/broker |
+| LMS/CMS pods | Elasticsearch EC2 | 9200 | search |
+| EKS worker nodes | EFS mount targets | 2049 | RWX media/uploads |
+
+Security note:
+- DB/EFS resources are private and SG-restricted so only the EKS worker SG can initiate traffic to these ports.
+
 ## Architecture Diagram
 
 ```mermaid
