@@ -146,7 +146,7 @@ Optional:
 ```bash
 kubectl -n openedx-prod get deploy lms -w
 ```
-- `docs/screenshots/hpa-scale-watch.png`
+This is optional evidence only and is not required for the minimum checklist.
 
 ### 5) Grafana Dashboard
 Commands (do not screenshot password output):
