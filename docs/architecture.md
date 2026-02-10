@@ -10,7 +10,7 @@ This document explains what is deployed, where it runs (AWS/Kubernetes), and how
 - `openedx-prod` (Open edX workloads)
 - `ingress-nginx` (NGINX Ingress Controller)
 - `observability` (Prometheus/Grafana + Loki)
-- Domains (placeholders for assessment): `lms.openedx.local`, `studio.openedx.local`
+- Domains (placeholders for assessment): `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
 - Databases are external to Kubernetes (RDS + EC2), private only.
 
 ## Components (By Layer)
@@ -19,7 +19,7 @@ Edge + security:
 - AWS WAF attached to CloudFront (header-based block rule for proof)
 - CloudFront distribution (origin: the ingress NLB)
 - AWS NLB created by `ingress-nginx` Service type `LoadBalancer`
-- NGINX Ingress Controller terminates TLS and routes to services
+- NGINX Ingress Controller terminates TLS (direct ingress access) and routes to services
 
 Application (EKS pods in `openedx-prod`):
 - LMS deployment + service
@@ -56,7 +56,7 @@ Backups:
 
 `openedx-prod`:
 - Deployments: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp`, `meilisearch`
-- Ingress: `openedx` (hosts `lms.openedx.local`, `studio.openedx.local`)
+- Ingress: `openedx` (hosts `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`)
 - HPA: `lms-hpa`, `cms-hpa` (min=2, max=6, CPU target 70%)
 - PVC: `openedx-media` (RWX, EFS) and `meilisearch` (RWO, EBS gp3)
 
@@ -77,7 +77,7 @@ Security groups (SG) intent:
 
 Ports (high-level):
 - Internet -> CloudFront: 443
-- CloudFront -> NLB: 443 (to NGINX Ingress)
+- CloudFront -> NLB: 80 (HTTP to origin, assessment-mode)
 - NGINX -> LMS/CMS services: 8000/tcp
 - Pods -> RDS MySQL: 3306/tcp
 - Pods -> MongoDB: 27017/tcp
@@ -92,7 +92,7 @@ This table summarizes the minimum required network paths for the deployment.
 | From | To | Port | Why |
 |---|---|---:|---|
 | Internet | CloudFront | 443 | public entrypoint |
-| CloudFront | NLB (ingress-nginx) | 443 | edge to origin |
+| CloudFront | NLB (ingress-nginx) | 80 | edge to origin (HTTP, assessment-mode) |
 | NLB | NGINX Ingress Controller pods | 443/80 | TLS termination + routing |
 | NGINX Ingress | LMS/CMS services | 8000 | app traffic |
 | LMS/CMS/Workers pods | RDS MySQL | 3306 | relational DB |
@@ -158,4 +158,6 @@ graph TD
 ## Notes (Assessment vs Real Production)
 
 - CloudFront default domain (e.g. `d123.cloudfront.net`) does not match the Ingress host rules (`lms.openedx.local`, `studio.openedx.local`), so a default request can return 404. WAF proof uses a header-based block rule (403) which is independent of host routing.
-- For real production you would use real DNS + ACM certificates, and configure CloudFront alternate domain names that match the Ingress hosts.
+- CloudFront origin is configured as HTTP-only in Terraform (`origin_protocol_policy = "http-only"`) because the origin uses a self-signed certificate for placeholder domains. CloudFront requires a publicly trusted origin certificate for HTTPS-to-origin.
+- TLS termination at NGINX Ingress is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local` (placeholder domains mapped locally).
+- For real production you would use real DNS + ACM certificates, configure CloudFront alternate domain names that match the Ingress hosts, and switch CloudFront to HTTPS-to-origin.

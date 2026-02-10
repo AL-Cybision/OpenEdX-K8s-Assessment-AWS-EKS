@@ -17,7 +17,7 @@ This document explains the key architectural and operational choices, why they w
 ## Cluster and Networking
 
 Kubernetes version:
-- Choice: EKS `1.32`
+- Choice: EKS `1.33`
 - Rationale: stable EKS version with broad addon support; avoids "latest but unproven in this environment" risk during an assessment
 - Tradeoff: not the newest version; upgrading is straightforward in EKS but should be tested (addons + workloads)
 
@@ -107,6 +107,7 @@ CloudFront + WAF:
 - Choice: CloudFront distribution in front of the ingress NLB with a WAF rule that blocks `X-Block-Me: 1`
 - Rationale: meets requirement and provides simple, unambiguous proof (HTTP/2 403)
 - Tradeoff: without real DNS/hostnames, default CloudFront requests can return 404 due to Ingress host routing
+- Origin protocol: CloudFront uses HTTP-to-origin (`origin_protocol_policy = "http-only"`) because the NGINX Ingress uses a self-signed certificate for placeholder domains and CloudFront requires a publicly trusted cert for HTTPS-to-origin
 
 ## What Would Be Hardened For Real Production (Not Required For Assessment)
 

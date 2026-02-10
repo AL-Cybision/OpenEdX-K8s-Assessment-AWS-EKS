@@ -50,6 +50,18 @@ kubectl -n openedx-prod logs verify-net
 kubectl -n openedx-prod delete pod verify-net --ignore-not-found
 ```
 
+Captured output (from `kubectl -n openedx-prod logs verify-net`, 2026-02-10):
+```text
+openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:3306) open
+192.168.88.164 (192.168.88.164:27017) open
+192.168.101.224 (192.168.101.224:6379) open
+192.168.77.200 (192.168.77.200:9200) open
+{
+  "name" : "openedx-prod-es-1",
+  "cluster_name" : "openedx-prod-es"
+}
+```
+
 ## 4) HPA Scaling Proof
 Generate load (k6):
 ```bash

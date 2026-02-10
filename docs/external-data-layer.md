@@ -169,16 +169,19 @@ Do not print secret values in shared logs.
 - All DB services are in **private subnets** and **not publicly accessible**.
 - Security groups only allow inbound from the EKS worker SG.
 
-## Latest Verification (2026-02-09)
+## Latest Verification (2026-02-10)
 
-From an EKS `netcheck` pod:
+From an EKS `verify-net` pod (`kubectl -n openedx-prod logs verify-net`):
 
 ```text
-RDS 3306: connection succeeded
-Mongo 27017: connection succeeded
-Redis 6379: connection succeeded
-ES 9200: connection succeeded
-ES HTTP: responded with JSON header
+openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:3306) open
+192.168.88.164 (192.168.88.164:27017) open
+192.168.101.224 (192.168.101.224:6379) open
+192.168.77.200 (192.168.77.200:9200) open
+{
+  "name" : "openedx-prod-es-1",
+  "cluster_name" : "openedx-prod-es"
+}
 ```
 - Instance sizes are intentionally small for cost control.
 - For production hardening: enable backups, multi-AZ, monitoring, and authentication hardening.

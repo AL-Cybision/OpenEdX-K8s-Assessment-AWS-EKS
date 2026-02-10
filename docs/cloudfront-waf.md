@@ -6,6 +6,12 @@
 infra/cloudfront-waf/apply.sh
 ```
 
+Origin protocol note:
+- This repo uses `origin_protocol_policy = "http-only"` (CloudFront -> origin over HTTP).
+- Reason: the NGINX Ingress uses a **self-signed** certificate for placeholder domains (`*.openedx.local`), and CloudFront requires a publicly trusted certificate for HTTPS-to-origin.
+- TLS termination at NGINX is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local`.
+- Production hardening: use real DNS + a trusted certificate (ACM or otherwise) and switch CloudFront to HTTPS-to-origin.
+
 Outputs (captured):
 
 ```text

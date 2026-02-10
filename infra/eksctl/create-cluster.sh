@@ -6,7 +6,7 @@ TEMPLATE="${SCRIPT_DIR}/cluster.yaml"
 
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
-K8S_VERSION="${K8S_VERSION:-1.32}"
+K8S_VERSION="${K8S_VERSION:-1.33}"
 
 TMP_CFG="$(mktemp)"
 trap 'rm -f "${TMP_CFG}"' EXIT
