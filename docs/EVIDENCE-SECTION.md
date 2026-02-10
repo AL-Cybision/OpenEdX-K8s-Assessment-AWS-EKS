@@ -5,7 +5,7 @@ Below is the exact evidence checklist and command set. Replace `TODO` placeholde
 ## 1) EKS Cluster Proof
 - Screenshot: EKS cluster overview (openedx-eks, Status ACTIVE)
 - File: `docs/screenshots/eks-cluster-active.png`
-- TODO: Add image link
+![](screenshots/eks-cluster-active.png)
 
 ## 2) OpenEdX Running (Pods + Ingress)
 Commands:
@@ -16,7 +16,8 @@ kubectl -n openedx-prod get ingress openedx
 Screenshots:
 - `docs/screenshots/openedx-pods.png`
 - `docs/screenshots/openedx-ingress.png`
-- TODO: Add image links
+![](screenshots/openedx-pods.png)
+![](screenshots/openedx-ingress.png)
 
 ## 3) External Data Layer Proof
 Screenshots:
@@ -24,7 +25,8 @@ Screenshots:
   - `docs/screenshots/rds-private-endpoint.png`
 - EC2 instances list (mongo/redis/es private IPs, no public IPv4)
   - `docs/screenshots/ec2-private-ips.png`
-- TODO: Add image links
+![](screenshots/rds-private-endpoint.png)
+![](screenshots/ec2-private-ips.png)
 
 Terminal proof (from inside EKS, no secrets printed):
 ```bash
@@ -92,7 +94,7 @@ kubectl -n openedx-prod get hpa
 ```
 Screenshot:
 - `docs/screenshots/hpa-scaling.png`
-- TODO: Add image link
+![](screenshots/hpa-scaling.png)
 
 Optional:
 ```bash
@@ -111,7 +113,7 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80
 
 Screenshot:
 - `docs/screenshots/grafana-dashboard.png`
-- TODO: Add image link
+![](screenshots/grafana-dashboard.png)
 
 ## 6) Central Logs (Loki)
 Grafana Explore:
@@ -121,13 +123,14 @@ Grafana Explore:
 
 Screenshot:
 - `docs/screenshots/loki-logs.png`
-- TODO: Add image link
+![](screenshots/loki-logs.png)
 
 ## 7) CloudFront + WAF
 Screenshots:
 - CloudFront distribution details: `docs/screenshots/cloudfront-details.png`
 - WAF WebACL + rule: `docs/screenshots/waf-webacl.png`
-- TODO: Add image links
+![](screenshots/cloudfront-details.png)
+![](screenshots/waf-webacl.png)
 
 Terminal proof of block:
 ```bash
@@ -137,4 +140,4 @@ curl -sSI -H "X-Block-Me: 1" "https://${CF_DOMAIN}/"
 ```
 Screenshot:
 - `docs/screenshots/waf-block-403.png`
-- TODO: Add image link
+![](screenshots/waf-block-403.png)
