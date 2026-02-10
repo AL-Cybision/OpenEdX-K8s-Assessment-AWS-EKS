@@ -21,6 +21,10 @@ kubectl -n openedx-prod get ingress openedx
 - Screenshot: output showing hosts `lms.openedx.local` and `studio.openedx.local`
 - File: `docs/screenshots/openedx-ingress.png`
 
+### Screenshot (Browser)
+- Screenshot: LMS UI page loads in browser (Welcome to My Open edX)
+- File: `docs/screenshots/OpenEdxLMS.png`
+
 ## 3) External Data Layer Proof (AWS Console)
 - Screenshot: RDS instance details page showing endpoint and private networking (e.g., Internet access gateway: Disabled / not public)
   - File: `docs/screenshots/rds-private-endpoint.png`

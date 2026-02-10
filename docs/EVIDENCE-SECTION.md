@@ -16,8 +16,10 @@ kubectl -n openedx-prod get ingress openedx
 Screenshots:
 - `docs/screenshots/openedx-pods.png`
 - `docs/screenshots/openedx-ingress.png`
+- `docs/screenshots/OpenEdxLMS.png` (browser: LMS UI loaded)
 ![](screenshots/openedx-pods.png)
 ![](screenshots/openedx-ingress.png)
+![](screenshots/OpenEdxLMS.png)
 
 ## 3) External Data Layer Proof
 Screenshots:
