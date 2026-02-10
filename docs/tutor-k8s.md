@@ -27,13 +27,13 @@ python3 -m venv .venv
 Use AWS Secrets Manager for the DB credentials. **Do not print secrets.**
 
 ```bash
-RDS_SECRET_ARN=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_secret_arn)
-MONGO_SECRET_ARN=$(./infra/terraform_executable -chdir=infra/terraform output -raw mongo_secret_arn)
-REDIS_SECRET_ARN=$(./infra/terraform_executable -chdir=infra/terraform output -raw redis_secret_arn)
+RDS_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw rds_secret_arn)
+MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
+REDIS_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw redis_secret_arn)
 
-MONGO_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw mongo_private_ip)
-REDIS_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw redis_private_ip)
-ES_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw elasticsearch_private_ip)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+REDIS_IP=$(terraform -chdir=infra/terraform output -raw redis_private_ip)
+ES_IP=$(terraform -chdir=infra/terraform output -raw elasticsearch_private_ip)
 
 RDS_SECRET=$(aws secretsmanager get-secret-value --secret-id "$RDS_SECRET_ARN" --region us-east-1 --query SecretString --output text)
 MONGO_SECRET=$(aws secretsmanager get-secret-value --secret-id "$MONGO_SECRET_ARN" --region us-east-1 --query SecretString --output text)
@@ -194,7 +194,7 @@ MEILISEARCH_ENABLED= True
 Simple index/query verification from inside LMS:
 
 ```bash
-ES_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw elasticsearch_private_ip)
+ES_IP=$(terraform -chdir=infra/terraform output -raw elasticsearch_private_ip)
 kubectl -n openedx-prod exec -i deploy/lms -- sh -c '
 curl -s -X POST "http://'"${ES_IP}"':9200/tutor_verify/_doc/1?refresh=wait_for" \
   -H "Content-Type: application/json" \

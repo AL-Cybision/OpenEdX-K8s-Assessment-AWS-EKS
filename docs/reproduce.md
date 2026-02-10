@@ -9,7 +9,7 @@ Scope: you can use an **existing EKS cluster**, or create one using `eksctl` (in
 Required tools:
 - `aws`, `kubectl`, `helm`, `jq`, `python3`
 - Optional (for cluster creation): `eksctl`
-- Terraform: use `./infra/terraform_executable` (pinned binary in repo) or set `TF_BIN=/path/to/terraform`
+- Terraform: `terraform` must be available in `PATH`
 
 Verify AWS + cluster access:
 ```bash
@@ -66,7 +66,7 @@ infra/terraform/apply.sh
 
 Verify (no secrets printed):
 ```bash
-RDS_ENDPOINT=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_endpoint)
+RDS_ENDPOINT=$(terraform -chdir=infra/terraform output -raw rds_endpoint)
 aws rds describe-db-instances --region us-east-1 \
   --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].[DBInstanceIdentifier,PubliclyAccessible,Engine,EngineVersion]" \
   --output table

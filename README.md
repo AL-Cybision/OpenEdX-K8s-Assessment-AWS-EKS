@@ -70,10 +70,10 @@ Screenshots:
 
 Terminal proof (no secrets printed):
 ```bash
-RDS_ENDPOINT=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_endpoint)
-MONGO_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw mongo_private_ip)
-REDIS_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw redis_private_ip)
-ES_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw elasticsearch_private_ip)
+RDS_ENDPOINT=$(terraform -chdir=infra/terraform output -raw rds_endpoint)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+REDIS_IP=$(terraform -chdir=infra/terraform output -raw redis_private_ip)
+ES_IP=$(terraform -chdir=infra/terraform output -raw elasticsearch_private_ip)
 
 kubectl -n openedx-prod run verify-net --image=alpine:3.20 --restart=Never \
   --command -- sh -c "apk add --no-cache busybox-extras curl >/dev/null; \
@@ -173,7 +173,7 @@ Screenshots:
 
 Terminal proof of block:
 ```bash
-CF_DOMAIN=$(./infra/terraform_executable -chdir=infra/cloudfront-waf output -raw cloudfront_domain_name)
+CF_DOMAIN=$(terraform -chdir=infra/cloudfront-waf output -raw cloudfront_domain_name)
 
 curl -sSI -H "X-Block-Me: 1" "https://${CF_DOMAIN}/"
 ```

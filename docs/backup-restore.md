@@ -27,13 +27,13 @@ Open edX uploads/media are stored on an EFS filesystem (RWX). For backups, use A
 
 Enable automatic backups (EFS backup policy):
 ```bash
-EFS_ID=$(./infra/terraform_executable -chdir=infra/media-efs output -raw efs_file_system_id)
+EFS_ID=$(terraform -chdir=infra/media-efs output -raw efs_file_system_id)
 aws efs put-backup-policy --region us-east-1 --file-system-id "$EFS_ID" --backup-policy Status=ENABLED
 ```
 
 Disable automatic backups (cost control):
 ```bash
-EFS_ID=$(./infra/terraform_executable -chdir=infra/media-efs output -raw efs_file_system_id)
+EFS_ID=$(terraform -chdir=infra/media-efs output -raw efs_file_system_id)
 aws efs put-backup-policy --region us-east-1 --file-system-id "$EFS_ID" --backup-policy Status=DISABLED
 ```
 

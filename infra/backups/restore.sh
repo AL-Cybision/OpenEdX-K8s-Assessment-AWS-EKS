@@ -5,11 +5,8 @@ REGION="${AWS_REGION:-us-east-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TS="$(date +%Y%m%d-%H%M%S)"
 
-TF_BIN="${TF_BIN:-${SCRIPT_DIR}/../terraform_executable}"
 TF_DIR="${TF_DIR:-${SCRIPT_DIR}/../terraform}"
-if [ ! -x "${TF_BIN}" ]; then
-  TF_BIN="$(command -v terraform)"
-fi
+command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 
 usage() {
   cat <<'EOF'
@@ -60,8 +57,8 @@ case "${cmd}" in
     DB_ID="${DB_ID:-}"
     if [ -z "${DB_ID}" ]; then
       # Best-effort discovery via Terraform output (requires state).
-      if "${TF_BIN}" -chdir="${TF_DIR}" output -raw rds_endpoint >/dev/null 2>&1; then
-        RDS_ENDPOINT="$("${TF_BIN}" -chdir="${TF_DIR}" output -raw rds_endpoint)"
+      if terraform -chdir="${TF_DIR}" output -raw rds_endpoint >/dev/null 2>&1; then
+        RDS_ENDPOINT="$(terraform -chdir="${TF_DIR}" output -raw rds_endpoint)"
         DB_ID="$(aws rds describe-db-instances --region "${REGION}" \
           --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].DBInstanceIdentifier | [0]" \
           --output text)"
@@ -183,4 +180,3 @@ case "${cmd}" in
     exit 2
     ;;
 esac
-

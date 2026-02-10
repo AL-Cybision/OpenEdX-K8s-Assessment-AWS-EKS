@@ -74,10 +74,10 @@ Symptoms:
 
 Fast connectivity probe from inside EKS:
 ```bash
-RDS_ENDPOINT=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_endpoint)
-MONGO_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw mongo_private_ip)
-REDIS_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw redis_private_ip)
-ES_IP=$(./infra/terraform_executable -chdir=infra/terraform output -raw elasticsearch_private_ip)
+RDS_ENDPOINT=$(terraform -chdir=infra/terraform output -raw rds_endpoint)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+REDIS_IP=$(terraform -chdir=infra/terraform output -raw redis_private_ip)
+ES_IP=$(terraform -chdir=infra/terraform output -raw elasticsearch_private_ip)
 
 kubectl -n openedx-prod run verify-net --rm -it --image=alpine:3.20 -- sh -c "\
 apk add --no-cache busybox-extras curl >/dev/null; \

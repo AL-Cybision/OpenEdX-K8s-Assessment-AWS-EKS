@@ -2,12 +2,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TF_BIN="${TF_BIN:-${SCRIPT_DIR}/../terraform_executable}"
-if [ ! -x "${TF_BIN}" ]; then
-  TF_BIN="$(command -v terraform)"
-fi
+command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 
-CF_DOMAIN=$("${TF_BIN}" -chdir="${SCRIPT_DIR}" output -raw cloudfront_domain_name)
+CF_DOMAIN=$(terraform -chdir="${SCRIPT_DIR}" output -raw cloudfront_domain_name)
 
 if [ -z "${CF_DOMAIN}" ]; then
   echo "CloudFront domain not found" >&2

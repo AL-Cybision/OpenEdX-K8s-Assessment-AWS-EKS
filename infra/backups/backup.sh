@@ -4,11 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REGION="us-east-1"
-TF_BIN="${TF_BIN:-${SCRIPT_DIR}/../terraform_executable}"
 TF_DIR="${TF_DIR:-${SCRIPT_DIR}/../terraform}"
-if [ ! -x "${TF_BIN}" ]; then
-  TF_BIN="$(command -v terraform)"
-fi
+command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 TS=$(date +%Y%m%d-%H%M%S)
 
 require_cmd() {
@@ -23,7 +20,7 @@ require_cmd kubectl
 require_cmd jq
 
 # --- RDS snapshot ---
-RDS_ENDPOINT=$(${TF_BIN} -chdir=${TF_DIR} output -raw rds_endpoint)
+RDS_ENDPOINT=$(terraform -chdir="${TF_DIR}" output -raw rds_endpoint)
 DB_ID=$(aws rds describe-db-instances --region ${REGION} \
   --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].DBInstanceIdentifier | [0]" \
   --output text)
@@ -42,7 +39,7 @@ echo "RDS snapshot created: ${DB_ID}-${TS}"
 
 # --- EC2 DB snapshots (Mongo/Redis/Elasticsearch) ---
 for name in mongo redis elasticsearch; do
-  ip=$(${TF_BIN} -chdir=${TF_DIR} output -raw ${name}_private_ip)
+  ip=$(terraform -chdir="${TF_DIR}" output -raw "${name}_private_ip")
   instance_id=$(aws ec2 describe-instances --region ${REGION} \
     --filters Name=private-ip-address,Values=${ip} \
     --query 'Reservations[0].Instances[0].InstanceId' \

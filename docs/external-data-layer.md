@@ -47,14 +47,14 @@ infra/terraform/apply.sh
 
 Equivalent manual commands:
 ```bash
-./infra/terraform_executable -chdir=infra/terraform init -input=false
-./infra/terraform_executable -chdir=infra/terraform plan -input=false -out tfplan
+terraform -chdir=infra/terraform init -input=false
+terraform -chdir=infra/terraform plan -input=false -out tfplan
 ```
 
 Before apply, review instance sizes and costs in `variables.tf`.
 
 ```bash
-./infra/terraform_executable -chdir=infra/terraform apply -input=false tfplan
+terraform -chdir=infra/terraform apply -input=false tfplan
 ```
 
 ## Critical Validation Checklist (Required)
@@ -96,7 +96,7 @@ Before apply, review instance sizes and costs in `variables.tf`.
 List RDS instance:
 
 ```bash
-RDS_ENDPOINT=$(./infra/terraform_executable -chdir=infra/terraform output -raw rds_endpoint)
+RDS_ENDPOINT=$(terraform -chdir=infra/terraform output -raw rds_endpoint)
 aws rds describe-db-instances --region us-east-1 \
   --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].[DBInstanceIdentifier,PubliclyAccessible,Engine,EngineVersion]" \
   --output table
@@ -106,7 +106,7 @@ List EC2 instances:
 
 ```bash
 for name in mongo redis elasticsearch; do
-  ip=$(./infra/terraform_executable -chdir=infra/terraform output -raw ${name}_private_ip)
+  ip=$(terraform -chdir=infra/terraform output -raw ${name}_private_ip)
   aws ec2 describe-instances --region us-east-1 \
     --filters Name=private-ip-address,Values=${ip} \
     --query 'Reservations[].Instances[].[InstanceId,PrivateIpAddress,PublicIpAddress,State.Name]' \
@@ -117,7 +117,7 @@ done
 Get endpoints from Terraform:
 
 ```bash
-./infra/terraform_executable -chdir=infra/terraform output -json
+terraform -chdir=infra/terraform output -json
 ```
 
 Test connectivity from EKS:

@@ -2,15 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-TF_BIN="${TF_BIN:-${SCRIPT_DIR}/../../terraform_executable}"
-if [ ! -x "${TF_BIN}" ]; then
-  TF_BIN="$(command -v terraform)"
-fi
+command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 
 MEDIA_EFS_DIR="${SCRIPT_DIR}/../../media-efs"
 
-EFS_FS_ID="$("${TF_BIN}" -chdir="${MEDIA_EFS_DIR}" output -raw efs_file_system_id)"
-EFS_AP_ID="$("${TF_BIN}" -chdir="${MEDIA_EFS_DIR}" output -raw efs_access_point_id)"
+EFS_FS_ID="$(terraform -chdir="${MEDIA_EFS_DIR}" output -raw efs_file_system_id)"
+EFS_AP_ID="$(terraform -chdir="${MEDIA_EFS_DIR}" output -raw efs_access_point_id)"
 
 sed -e "s|__EFS_FILE_SYSTEM_ID__|${EFS_FS_ID}|g" \
     -e "s|__EFS_ACCESS_POINT_ID__|${EFS_AP_ID}|g" \
