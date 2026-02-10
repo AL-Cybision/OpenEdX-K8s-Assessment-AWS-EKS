@@ -10,6 +10,7 @@ Required tools:
 - `aws`, `kubectl`, `helm`, `jq`, `python3`
 - Optional (for cluster creation): `eksctl`
 - Terraform: `terraform` must be available in `PATH`
+- Security note: Terraform state files (for example `infra/**/terraform.tfstate`) are generated locally and contain secrets. They are `.gitignore`'d; do not commit or share them.
 
 Verify AWS + cluster access:
 ```bash
