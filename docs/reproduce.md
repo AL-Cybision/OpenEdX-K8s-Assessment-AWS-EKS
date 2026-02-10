@@ -102,6 +102,15 @@ kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
 kubectl -n openedx-prod get ingress openedx
 ```
 
+Browser access (with placeholder domains):
+```bash
+LB_DNS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
+
+# MFE login uses apps.lms.openedx.local, so include it here.
+printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.openedx.local\n" "$LB_IP" | sudo tee -a /etc/hosts >/dev/null
+```
+
 ## 6) HPA + Load Test
 
 Apply HPA + resource requests/limits:
@@ -129,13 +138,13 @@ spec:
   template:
     spec:
       restartPolicy: Never
-        containers:
+      containers:
         - name: k6
           image: grafana/k6:0.49.0
           args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
           volumeMounts:
-          - name: scripts
-            mountPath: /scripts
+            - name: scripts
+              mountPath: /scripts
       volumes:
         - name: scripts
           configMap:

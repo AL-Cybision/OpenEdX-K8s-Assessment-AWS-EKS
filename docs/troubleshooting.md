@@ -7,6 +7,7 @@ This guide lists the highest-probability failures for this assessment and the fa
 Symptoms:
 - Browser shows 404/502
 - CloudFront default domain returns 404
+- Login redirects to `apps.lms.openedx.local` and the browser shows DNS error
 
 Checks:
 ```bash
@@ -17,12 +18,14 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
 Notes:
 - Ingress routes by `Host`. If you curl the NLB hostname without a matching `Host` header, NGINX will return 404.
+- The MFE (micro-frontend) login UI uses `apps.lms.openedx.local`. With placeholder domains, you must map it locally (for example in `/etc/hosts`).
 
 Test directly against the NLB (replace `NLB_HOSTNAME`):
 ```bash
 NLB_HOSTNAME=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 curl -k -sSI -H 'Host: lms.openedx.local' "https://${NLB_HOSTNAME}/"
 curl -k -sSI -H 'Host: studio.openedx.local' "https://${NLB_HOSTNAME}/"
+curl -k -sSI -H 'Host: apps.lms.openedx.local' "https://${NLB_HOSTNAME}/authn/login"
 ```
 
 CloudFront note:

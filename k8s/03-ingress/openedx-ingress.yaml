@@ -16,6 +16,7 @@ spec:
     - hosts:
         - lms.openedx.local
         - studio.openedx.local
+        - apps.lms.openedx.local
       secretName: openedx-tls
   rules:
     - host: lms.openedx.local
@@ -38,3 +39,13 @@ spec:
                 name: cms
                 port:
                   number: 8000
+    - host: apps.lms.openedx.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: mfe
+                port:
+                  number: 8002
