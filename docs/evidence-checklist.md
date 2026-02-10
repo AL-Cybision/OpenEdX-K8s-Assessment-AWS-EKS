@@ -22,7 +22,7 @@ kubectl -n openedx-prod get ingress openedx
 - File: `docs/screenshots/openedx-ingress.png`
 
 ## 3) External Data Layer Proof (AWS Console)
-- Screenshot: RDS instance details page showing endpoint and **Not publicly accessible**
+- Screenshot: RDS instance details page showing endpoint and private networking (e.g., Internet access gateway: Disabled / not public)
   - File: `docs/screenshots/rds-private-endpoint.png`
 - Screenshot: EC2 instances list for mongo/redis/es showing **Private IPs** and **No public IPv4**
   - File: `docs/screenshots/ec2-private-ips.png`
@@ -72,7 +72,7 @@ spec:
       containers:
         - name: k6
           image: grafana/k6:0.49.0
-          args: ["run", "/scripts/loadtest-k6.js"]
+          args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -115,9 +115,10 @@ kubectl -n observability port-forward svc/kube-prometheus-stack-grafana 3000:80
 - File: `docs/screenshots/grafana-dashboard.png`
 
 ## 6) Central Logs (UI)
-- Screenshot: Grafana Explore (Loki) showing logs from `lms` pod
+- Screenshot: Grafana Explore (Loki) showing a LogQL graph derived from `lms` logs (top paths)
 - Datasource: `Loki`
-- Query: `{namespace="openedx-prod", pod=~"lms-.*"}`
+- Query (graph, from `lms` logs): `topk(5, sum by (path) (rate({namespace="openedx-prod", pod=~"lms-.*"} | regexp "GET (?P<path>/[^ ]*)"[5m])))`
+- Raw logs query (optional): `{namespace="openedx-prod", pod=~"lms-.*"}`
 - If Explore shows `React Monaco Editor failed to load`, switch from `Code` to `Builder`.
 - File: `docs/screenshots/loki-logs.png`
 

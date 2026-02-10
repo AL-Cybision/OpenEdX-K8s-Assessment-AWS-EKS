@@ -36,10 +36,10 @@ spec:
   template:
     spec:
       restartPolicy: Never
-      containers:
+          containers:
         - name: k6
           image: grafana/k6:0.49.0
-          args: ["run", "/scripts/loadtest-k6.js"]
+          args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
           volumeMounts:
             - name: scripts
               mountPath: /scripts

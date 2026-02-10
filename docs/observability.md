@@ -45,7 +45,9 @@ Dashboard screenshot:
 - Grafana: `Dashboards` -> search `Kubernetes / Compute Resources / Namespace (Pods)` -> set `namespace=openedx-prod`
 
 Logs screenshot:
-- Grafana: `Explore` -> datasource `Loki` -> query: `{namespace="openedx-prod", pod=~"lms-.*"}`
+- Grafana: `Explore` -> datasource `Loki`
+- Query (graph, from `lms` logs): `topk(5, sum by (path) (rate({namespace="openedx-prod", pod=~"lms-.*"} | regexp "GET (?P<path>/[^ ]*)"[5m])))`
+- Raw logs query (optional): `{namespace="openedx-prod", pod=~"lms-.*"}`
 - If Explore shows `React Monaco Editor failed to load`, switch from `Code` to `Builder`.
 
 ## Alerting Configuration

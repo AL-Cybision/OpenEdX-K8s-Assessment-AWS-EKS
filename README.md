@@ -63,7 +63,7 @@ Screenshots:
 
 ### 3) External Data Layer Proof
 Screenshots:
-- RDS instance details (endpoint + not public)
+- RDS instance details (endpoint + private networking / not public)
   - `docs/screenshots/rds-private-endpoint.png`
 - EC2 instances list (mongo/redis/es private IPs, no public IPv4)
   - `docs/screenshots/ec2-private-ips.png`
@@ -114,7 +114,7 @@ spec:
       containers:
         - name: k6
           image: grafana/k6:0.49.0
-          args: ["run", "/scripts/loadtest-k6.js"]
+          args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
           volumeMounts:
             - name: scripts
               mountPath: /scripts
@@ -160,7 +160,8 @@ Screenshot:
 ### 6) Central Logs (Loki)
 Grafana Explore:
 - Datasource: `Loki`
-- Query: `{namespace="openedx-prod", pod=~"lms-.*"}`
+- Query (graph, from `lms` logs): `topk(5, sum by (path) (rate({namespace="openedx-prod", pod=~"lms-.*"} | regexp "GET (?P<path>/[^ ]*)"[5m])))`
+- Raw logs query (optional): `{namespace="openedx-prod", pod=~"lms-.*"}`
 - If Explore shows `React Monaco Editor failed to load`, switch from `Code` to `Builder`.
 
 Screenshot:
