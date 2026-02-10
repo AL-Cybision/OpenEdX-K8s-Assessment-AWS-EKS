@@ -102,6 +102,15 @@ kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
 kubectl -n openedx-prod get ingress openedx
 ```
 
+Fix AuthN/Authoring MFE under HTTPS (required when TLS terminates at NGINX Ingress):
+```bash
+mkdir -p "${HOME}/.local/share/tutor-plugins"
+cp data-layer/tutor/plugins/openedx-mfe-https.py "${HOME}/.local/share/tutor-plugins/openedx-mfe-https.py"
+.venv/bin/tutor plugins enable openedx-mfe-https
+
+infra/k8s/04-tutor-apply/apply.sh
+```
+
 Browser access (with placeholder domains):
 ```bash
 LB_DNS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')

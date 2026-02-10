@@ -150,6 +150,30 @@ infra/k8s/04-tutor-apply/apply.sh
 .venv/bin/tutor k8s init
 ```
 
+## Fix MFE Login/Register Under HTTPS (Required)
+
+Because TLS terminates at the NGINX Ingress, MFEs are served over **HTTPS**.
+Tutor defaults add only `http://apps.<LMS_HOST>` to CORS/CSRF allow-lists, which
+breaks the AuthN MFE in the browser (register/login gets stuck).
+
+Enable a small local Tutor plugin that adds the `https://apps.<LMS_HOST>` origin
+to the LMS/CMS CORS + CSRF trusted origins, then re-apply:
+
+```bash
+mkdir -p "${HOME}/.local/share/tutor-plugins"
+cp data-layer/tutor/plugins/openedx-mfe-https.py "${HOME}/.local/share/tutor-plugins/openedx-mfe-https.py"
+.venv/bin/tutor plugins enable openedx-mfe-https
+
+infra/k8s/04-tutor-apply/apply.sh
+```
+
+Verification:
+
+```bash
+curl -kIs -H 'Origin: https://apps.lms.openedx.local' \
+  https://lms.openedx.local/api/user/v1/account/registration/ | rg -i 'access-control-allow-origin'
+```
+
 ## Enable Elasticsearch Backend (Search)
 
 Tutor v21 defaults to Meilisearch. To switch to Elasticsearch, enable a local plugin that injects settings patches.

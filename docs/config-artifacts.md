@@ -35,7 +35,7 @@ Config export script (redacts secrets):
 
 Tutor patches and plugins:
 - `data-layer/tutor/patches/` (settings patches)
-- `data-layer/tutor/plugins/` (local plugin to enable Elasticsearch integration)
+- `data-layer/tutor/plugins/` (local plugins: Elasticsearch backend + HTTPS MFE CORS fix)
 
 Tutor deployment wrapper (always use this to avoid Caddy reappearing):
 - `infra/k8s/04-tutor-apply/apply.sh`

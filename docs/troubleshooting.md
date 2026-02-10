@@ -19,6 +19,7 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 Notes:
 - Ingress routes by `Host`. If you curl the NLB hostname without a matching `Host` header, NGINX will return 404.
 - The MFE (micro-frontend) login UI uses `apps.lms.openedx.local`. With placeholder domains, you must map it locally (for example in `/etc/hosts`).
+- If login/register is stuck on `https://apps.<LMS_HOST>/authn/...`, check that LMS/CMS CORS allow `https://apps.<LMS_HOST>` (see `data-layer/tutor/plugins/openedx-mfe-https.py`).
 
 Test directly against the NLB (replace `NLB_HOSTNAME`):
 ```bash
@@ -26,6 +27,12 @@ NLB_HOSTNAME=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o json
 curl -k -sSI -H 'Host: lms.openedx.local' "https://${NLB_HOSTNAME}/"
 curl -k -sSI -H 'Host: studio.openedx.local' "https://${NLB_HOSTNAME}/"
 curl -k -sSI -H 'Host: apps.lms.openedx.local' "https://${NLB_HOSTNAME}/authn/login"
+```
+
+Verify CORS header is present (required for AuthN MFE):
+```bash
+curl -kIs -H 'Origin: https://apps.lms.openedx.local' \
+  https://lms.openedx.local/api/user/v1/account/registration/ | grep -i access-control-allow-origin
 ```
 
 CloudFront note:
