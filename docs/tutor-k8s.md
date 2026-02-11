@@ -249,6 +249,7 @@ kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
 ## Permanent Caddy Removal (Post-render)
 
 Tutor generates Caddy resources by default. The wrapper script uses a post-render filter to remove Caddy resources and Job/Namespace objects before apply.
+The same filter also normalizes `mfe` service type to `ClusterIP` (internal-only).
 
 - Wrapper: `infra/k8s/04-tutor-apply/apply.sh`
 - Filter: `infra/k8s/04-tutor-apply/postrender-remove-caddy.py`
@@ -275,9 +276,10 @@ Probes added:
 ```bash
 kubectl -n openedx-prod get pods
 kubectl -n openedx-prod get ingress openedx
+kubectl -n openedx-prod get svc mfe -o wide
 ```
 
-Expected: `lms`, `cms`, `lms-worker`, `cms-worker`, `meilisearch`, `mfe`, `smtp` all Running.
+Expected: `lms`, `cms`, `lms-worker`, `cms-worker`, `meilisearch`, `mfe`, `smtp` all Running and `mfe` service type is `ClusterIP`.
 
 ## Known Constraints
 

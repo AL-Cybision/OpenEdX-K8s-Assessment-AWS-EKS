@@ -21,6 +21,13 @@ kubectl -n openedx-prod get ingress openedx
 - Screenshot: output showing hosts `lms.openedx.local` and `studio.openedx.local`
 - File: `docs/screenshots/openedx-ingress.png`
 
+### Command
+```bash
+kubectl -n openedx-prod get svc mfe -o wide
+```
+- Screenshot: output showing `mfe` service type is `ClusterIP`
+- File: `docs/screenshots/mfe-service-clusterip.png`
+
 ### Screenshot (Browser)
 - Screenshot: LMS UI page loads in browser (Welcome to My Open edX)
 - File: `docs/screenshots/OpenEdxLMS.png`
@@ -50,6 +57,39 @@ kubectl -n openedx-prod run verify-net --image=alpine:3.20 --restart=Never \
 kubectl -n openedx-prod logs verify-net
 kubectl -n openedx-prod delete pod verify-net --ignore-not-found
 ```
+
+## 3.1) Studio Course + Mongo Persistence + Pod Restart (Terminal + UI)
+### Create Course in Studio
+- Open `https://studio.openedx.local`
+- Create a new course (for example `compliance-101`) and publish at least one unit/page
+- Screenshot: course exists in Studio
+- File: `docs/screenshots/studio-course-created.png`
+
+### Verify Mongo collections for course/modulestore
+```bash
+MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+MONGO_JSON=$(aws secretsmanager get-secret-value --secret-id "$MONGO_SECRET_ARN" --query SecretString --output text)
+MONGO_USER=$(echo "$MONGO_JSON" | jq -r '.app_username')
+MONGO_PASS=$(echo "$MONGO_JSON" | jq -r '.app_password')
+
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+kubectl -n openedx-prod run mongo-verify --image=mongo:6 --restart=Never -- \
+  sh -c "mongosh \"mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_IP}:27017/openedx?authSource=openedx\" --quiet --eval 'db.getCollectionNames().filter(n => /modulestore|course/i.test(n)).slice(0,20)'"
+kubectl -n openedx-prod logs mongo-verify
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+```
+- Screenshot: `mongo-verify` logs show course/modulestore-related collections
+- File: `docs/screenshots/mongo-course-persistence.png`
+
+### Restart application pods and re-verify course
+```bash
+kubectl -n openedx-prod rollout restart deploy/lms deploy/cms
+kubectl -n openedx-prod rollout status deploy/lms --timeout=10m
+kubectl -n openedx-prod rollout status deploy/cms --timeout=10m
+```
+- Screenshot: same course still visible after restart
+- File: `docs/screenshots/course-persistence-after-restart.png`
 
 ## 4) HPA Scaling Proof (Terminal)
 ### Generate Load (k6) + Watch HPA

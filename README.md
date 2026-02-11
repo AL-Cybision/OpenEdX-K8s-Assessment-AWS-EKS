@@ -59,13 +59,16 @@ Commands:
 ```bash
 kubectl -n openedx-prod get pods
 kubectl -n openedx-prod get ingress openedx
+kubectl -n openedx-prod get svc mfe -o wide
 ```
 Screenshots:
 - `docs/screenshots/openedx-pods.png`
 - `docs/screenshots/openedx-ingress.png`
+- `docs/screenshots/mfe-service-clusterip.png` (`mfe` type is `ClusterIP`)
 - `docs/screenshots/OpenEdxLMS.png` (browser: LMS UI loaded)
 ![](docs/screenshots/openedx-pods.png)
 ![](docs/screenshots/openedx-ingress.png)
+![](docs/screenshots/mfe-service-clusterip.png)
 ![](docs/screenshots/OpenEdxLMS.png)
 
 ### 3) External Data Layer Proof
@@ -108,6 +111,36 @@ openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:330
   "cluster_name" : "openedx-prod-es"
 }
 ```
+
+### 3b) Studio Course Creation + Mongo Persistence + Pod Restart
+Create a course in Studio (`https://studio.openedx.local`), then verify Mongo collections and post-restart persistence.
+
+Mongo verification command (no secrets printed):
+```bash
+MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+MONGO_JSON=$(aws secretsmanager get-secret-value --secret-id "$MONGO_SECRET_ARN" --query SecretString --output text)
+MONGO_USER=$(echo "$MONGO_JSON" | jq -r '.app_username')
+MONGO_PASS=$(echo "$MONGO_JSON" | jq -r '.app_password')
+
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+kubectl -n openedx-prod run mongo-verify --image=mongo:6 --restart=Never -- \
+  sh -c "mongosh \"mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_IP}:27017/openedx?authSource=openedx\" --quiet --eval 'db.getCollectionNames().filter(n => /modulestore|course/i.test(n)).slice(0,20)'"
+kubectl -n openedx-prod logs mongo-verify
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+```
+
+Restart and persistence check:
+```bash
+kubectl -n openedx-prod rollout restart deploy/lms deploy/cms
+kubectl -n openedx-prod rollout status deploy/lms --timeout=10m
+kubectl -n openedx-prod rollout status deploy/cms --timeout=10m
+```
+
+Screenshots:
+- `docs/screenshots/studio-course-created.png`
+- `docs/screenshots/mongo-course-persistence.png`
+- `docs/screenshots/course-persistence-after-restart.png`
 
 ### 4) HPA Scaling Proof
 Pre-step (required for reproducible HPA metrics and rollout):

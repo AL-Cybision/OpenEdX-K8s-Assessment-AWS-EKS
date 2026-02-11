@@ -137,6 +137,11 @@ cp data-layer/tutor/plugins/openedx-mfe-https.py "${HOME}/.local/share/tutor-plu
 infra/k8s/04-tutor-apply/apply.sh
 ```
 
+Verify `mfe` service is internal-only (`ClusterIP`) and not externally exposed via `NodePort`:
+```bash
+kubectl -n openedx-prod get svc mfe -o jsonpath='{.spec.type}{"\n"}'
+```
+
 Browser access (with placeholder domains):
 ```bash
 LB_DNS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
@@ -145,6 +150,37 @@ LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
 # MFE login uses apps.lms.openedx.local, so include it here.
 printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.openedx.local\n" "$LB_IP" | sudo tee -a /etc/hosts >/dev/null
 ```
+
+## 5.1) Studio Course Creation + Persistence Validation (Mandatory)
+
+Create one sample course in Studio:
+- Open `https://studio.openedx.local`
+- Create a new course (for example `compliance-101`)
+- Publish at least one unit/page
+
+Verify MongoDB contains course/modulestore collections (without printing secrets):
+```bash
+MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
+MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
+MONGO_JSON=$(aws secretsmanager get-secret-value --secret-id "$MONGO_SECRET_ARN" --query SecretString --output text)
+MONGO_USER=$(echo "$MONGO_JSON" | jq -r '.app_username')
+MONGO_PASS=$(echo "$MONGO_JSON" | jq -r '.app_password')
+
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+kubectl -n openedx-prod run mongo-verify --image=mongo:6 --restart=Never -- \
+  sh -c "mongosh \"mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_IP}:27017/openedx?authSource=openedx\" --quiet --eval 'db.getCollectionNames().filter(n => /modulestore|course/i.test(n)).slice(0,20)'"
+kubectl -n openedx-prod logs mongo-verify
+kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+```
+
+Restart LMS/CMS pods and confirm course still exists:
+```bash
+kubectl -n openedx-prod rollout restart deploy/lms deploy/cms
+kubectl -n openedx-prod rollout status deploy/lms --timeout=10m
+kubectl -n openedx-prod rollout status deploy/cms --timeout=10m
+```
+
+Re-open LMS/Studio and confirm the same course is still present.
 
 ## 6) HPA + Load Test
 

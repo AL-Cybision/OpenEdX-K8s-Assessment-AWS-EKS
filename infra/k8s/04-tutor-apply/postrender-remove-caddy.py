@@ -37,6 +37,7 @@ PROBE_CONFIG = {
 MEDIA_PVC_NAME = "openedx-media"
 MEDIA_VOLUME_NAME = "openedx-media"
 MEDIA_MOUNT_PATH = "/openedx/media"
+MFE_SERVICE_NAME = "mfe"
 
 
 def build_probe(cfg: dict) -> dict:
@@ -102,6 +103,20 @@ def add_media_mounts(doc: dict) -> None:
         mounts.append({"name": MEDIA_VOLUME_NAME, "mountPath": MEDIA_MOUNT_PATH})
 
 
+def normalize_service_types(doc: dict) -> None:
+    if doc.get("kind") != "Service":
+        return
+    name = (doc.get("metadata") or {}).get("name")
+    if name != MFE_SERVICE_NAME:
+        return
+
+    spec = doc.setdefault("spec", {})
+    spec["type"] = "ClusterIP"
+    spec.pop("externalTrafficPolicy", None)
+    for port in spec.get("ports", []):
+        port.pop("nodePort", None)
+
+
 def should_drop(doc: dict) -> bool:
     if not isinstance(doc, dict):
         return False
@@ -127,6 +142,7 @@ for d in in_docs:
         continue
     add_probes(d)
     add_media_mounts(d)
+    normalize_service_types(d)
     out_docs.append(d)
 
 yaml.safe_dump_all(out_docs, sys.stdout, sort_keys=False)
