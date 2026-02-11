@@ -77,9 +77,19 @@ args:
   - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
 YAML
 
-helm upgrade --install metrics-server metrics-server/metrics-server \
-  --namespace kube-system \
-  --values "${TMP_VALUES}" >/dev/null
+if helm -n kube-system status metrics-server >/dev/null 2>&1; then
+  echo "Upgrading existing Helm release: metrics-server"
+  helm upgrade --install metrics-server metrics-server/metrics-server \
+    --namespace kube-system \
+    --values "${TMP_VALUES}" >/dev/null
+elif kubectl -n kube-system get deploy metrics-server >/dev/null 2>&1; then
+  echo "metrics-server deployment already exists and is not Helm-managed; skipping Helm install."
+else
+  echo "Installing metrics-server via Helm"
+  helm upgrade --install metrics-server metrics-server/metrics-server \
+    --namespace kube-system \
+    --values "${TMP_VALUES}" >/dev/null
+fi
 
 kubectl -n kube-system rollout status deploy/metrics-server --timeout=5m
 

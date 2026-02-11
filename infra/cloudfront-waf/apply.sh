@@ -24,14 +24,15 @@ terraform -chdir="${SCRIPT_DIR}" init -input=false
 # Rerun safety: if local state is missing but same-named resources exist in AWS,
 # import them so plan/apply remains idempotent for assessors.
 if ! terraform -chdir="${SCRIPT_DIR}" state list 2>/dev/null | grep -qx "aws_wafv2_web_acl.this"; then
-  EXISTING_WAF_ARN="$(aws wafv2 list-web-acls --scope CLOUDFRONT --region "${AWS_REGION}" \
-    --query "WebACLs[?Name=='${WAF_NAME}'].ARN | [0]" --output text 2>/dev/null || true)"
-  if [ -n "${EXISTING_WAF_ARN}" ] && [ "${EXISTING_WAF_ARN}" != "None" ]; then
-    echo "Importing existing WAF WebACL into state: ${WAF_NAME}"
+  EXISTING_WAF_ID="$(aws wafv2 list-web-acls --scope CLOUDFRONT --region "${AWS_REGION}" \
+    --query "WebACLs[?Name=='${WAF_NAME}'].Id | [0]" --output text 2>/dev/null || true)"
+  if [ -n "${EXISTING_WAF_ID}" ] && [ "${EXISTING_WAF_ID}" != "None" ]; then
+    WAF_IMPORT_ID="${EXISTING_WAF_ID}/${WAF_NAME}/CLOUDFRONT"
+    echo "Importing existing WAF WebACL into state: ${WAF_IMPORT_ID}"
     terraform -chdir="${SCRIPT_DIR}" import -input=false \
       -var "origin_domain_name=${LB_HOSTNAME}" \
       -var "origin_protocol_policy=${ORIGIN_PROTOCOL_POLICY}" \
-      aws_wafv2_web_acl.this "${EXISTING_WAF_ARN}" >/dev/null
+      aws_wafv2_web_acl.this "${WAF_IMPORT_ID}" >/dev/null
   fi
 fi
 
