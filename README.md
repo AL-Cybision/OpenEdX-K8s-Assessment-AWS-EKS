@@ -34,15 +34,16 @@ Primary runbook (script-driven):
 
 High-level execution order:
 1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
-2. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
-3. NGINX ingress controller: `infra/ingress-nginx/install.sh`
-4. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
-5. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
-6. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
-7. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
-8. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
-9. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
-10. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
+2. Core add-ons (EBS CSI + `gp3` default + metrics-server): `infra/eksctl/install-core-addons.sh`
+3. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
+4. NGINX ingress controller: `infra/ingress-nginx/install.sh`
+5. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
+6. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
+7. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
+8. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+9. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
+10. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
+11. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
 
 ## Evidence Pack
 
@@ -109,6 +110,12 @@ openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:330
 ```
 
 ### 4) HPA Scaling Proof
+Pre-step (required for reproducible HPA metrics and rollout):
+```bash
+infra/k8s/05-hpa/apply.sh
+kubectl top nodes
+```
+
 Generate load (k6):
 ```bash
 kubectl -n openedx-prod create configmap k6-script \

@@ -63,6 +63,12 @@ openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:330
 ```
 
 ## 4) HPA Scaling Proof
+Pre-step (required for reproducible HPA metrics and rollout):
+```bash
+infra/k8s/05-hpa/apply.sh
+kubectl top nodes
+```
+
 Generate load (k6):
 ```bash
 kubectl -n openedx-prod create configmap k6-script \

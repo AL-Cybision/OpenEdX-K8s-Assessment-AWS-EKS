@@ -12,6 +12,15 @@ Origin protocol note:
 - TLS termination at NGINX is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local`.
 - Production hardening: use real DNS + a trusted certificate (ACM or otherwise) and switch CloudFront to HTTPS-to-origin.
 
+`infra/cloudfront-waf/apply.sh` supports protocol selection:
+```bash
+# assessment-mode default
+infra/cloudfront-waf/apply.sh
+
+# hardened mode (requires trusted cert on origin)
+ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
+```
+
 Outputs (captured):
 
 ```text

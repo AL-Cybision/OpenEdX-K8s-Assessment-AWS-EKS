@@ -10,6 +10,11 @@ Apply:
 infra/k8s/05-hpa/apply.sh
 ```
 
+Notes:
+- `infra/k8s/05-hpa/apply.sh` requires `metrics-server` (`kubectl top nodes` must work).
+- Default resource requests are tuned for reproducibility on `2 x t3.large`.
+- If rollout is capacity-constrained, temporarily scale nodegroup desired size to `3` before running k6.
+
 ## k6 Load Test (in-cluster)
 
 Script:
@@ -36,7 +41,7 @@ spec:
   template:
     spec:
       restartPolicy: Never
-          containers:
+      containers:
         - name: k6
           image: grafana/k6:0.49.0
           args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]

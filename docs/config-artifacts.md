@@ -104,6 +104,7 @@ Evidence checklist (screenshots + terminal proof):
 
 Deployment automation entrypoints:
 - `docs/reproduce.md` (end-to-end runbook)
+- `infra/eksctl/install-core-addons.sh` (EBS CSI + gp3 default + metrics-server)
 - `infra/terraform/apply.sh` (external data layer)
 - `infra/media-efs/apply.sh` (EFS media layer)
 - `infra/k8s/04-tutor-apply/apply.sh` (Tutor apply wrapper)

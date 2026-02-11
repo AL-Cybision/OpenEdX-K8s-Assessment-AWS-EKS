@@ -53,6 +53,12 @@ kubectl -n openedx-prod delete pod verify-net --ignore-not-found
 
 ## 4) HPA Scaling Proof (Terminal)
 ### Generate Load (k6) + Watch HPA
+Pre-step:
+```bash
+infra/k8s/05-hpa/apply.sh
+kubectl top nodes
+```
+
 Run load (in-cluster) in one terminal:
 ```bash
 kubectl -n openedx-prod create configmap k6-script \

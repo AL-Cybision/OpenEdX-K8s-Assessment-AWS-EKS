@@ -8,7 +8,7 @@ Scope: you can use an **existing EKS cluster**, or create one using `eksctl` (in
 
 Required tools:
 - `aws`, `kubectl`, `helm`, `jq`, `python3`
-- Optional (for cluster creation): `eksctl`
+- `eksctl` (for cluster creation and core add-ons script)
 - Terraform: `terraform` must be available in `PATH`
 - Security note: Terraform state files (for example `infra/**/terraform.tfstate`) are generated locally and contain secrets. They are `.gitignore`'d; do not commit or share them.
 
@@ -27,11 +27,28 @@ Cost note: this creates a VPC + a NAT gateway + 2 managed worker nodes, so charg
 infra/eksctl/create-cluster.sh
 ```
 
+Note: by default this also runs `infra/eksctl/install-core-addons.sh` after cluster creation (`INSTALL_CORE_ADDONS=true`).
+
 If you already have a cluster, skip this.
 
 Destroy when finished:
 ```bash
 infra/eksctl/delete-cluster.sh
+```
+
+## 0.2) Core Add-ons (Mandatory for this stack)
+
+Install EBS CSI + IAM role, set `gp3` default StorageClass, and install `metrics-server`:
+```bash
+infra/eksctl/install-core-addons.sh
+```
+
+Verify:
+```bash
+aws eks describe-addon --cluster-name openedx-eks --region us-east-1 --addon-name aws-ebs-csi-driver --query 'addon.status' --output text
+kubectl get storageclass
+kubectl -n kube-system get deploy metrics-server
+kubectl top nodes
 ```
 
 ## 1) Namespaces
@@ -80,10 +97,19 @@ Provision EFS + EFS CSI driver:
 infra/media-efs/apply.sh
 ```
 
-Create the EFS-backed PV/PVC (`openedx-media`) in `openedx-prod`:
+Create storage resources in `openedx-prod`:
+- Ensures `gp3` is the default StorageClass (for Meilisearch PVC on EBS CSI)
+- Creates the EFS-backed `openedx-media` PV/PVC
+
 ```bash
 infra/k8s/02-storage/apply.sh
+kubectl get storageclass
 kubectl -n openedx-prod get pvc openedx-media
+```
+
+If Meilisearch PVC is stuck from an earlier failed init:
+```bash
+kubectl -n openedx-prod delete pvc meilisearch --ignore-not-found
 ```
 
 ## 5) Tutor/Open edX Apply (Caddy Removed + Probes + Media Mount)
@@ -122,10 +148,20 @@ printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.
 
 ## 6) HPA + Load Test
 
-Apply HPA + resource requests/limits:
+Apply HPA + resource requests/limits (script validates metrics-server):
 ```bash
 infra/k8s/05-hpa/apply.sh
 kubectl -n openedx-prod get hpa
+```
+
+If `lms` rollout is blocked due capacity, temporarily scale nodegroup to 3 before load test:
+```bash
+NODEGROUP=$(aws eks list-nodegroups --cluster-name openedx-eks --region us-east-1 --query 'nodegroups[0]' --output text)
+aws eks update-nodegroup-config \
+  --cluster-name openedx-eks \
+  --nodegroup-name "${NODEGROUP}" \
+  --region us-east-1 \
+  --scaling-config minSize=2,maxSize=3,desiredSize=3
 ```
 
 Run k6 load test (in-cluster):
@@ -185,6 +221,11 @@ infra/observability/apply-alerts.sh
 ```bash
 infra/cloudfront-waf/apply.sh
 infra/cloudfront-waf/verify.sh
+```
+
+Production-hardening option (when ingress has a publicly trusted certificate):
+```bash
+ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
 ```
 
 ## 9) Backups

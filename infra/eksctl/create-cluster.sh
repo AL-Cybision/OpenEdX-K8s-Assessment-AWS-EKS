@@ -7,6 +7,7 @@ TEMPLATE="${SCRIPT_DIR}/cluster.yaml"
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 K8S_VERSION="${K8S_VERSION:-1.33}"
+INSTALL_CORE_ADDONS="${INSTALL_CORE_ADDONS:-true}"
 
 TMP_CFG="$(mktemp)"
 trap 'rm -f "${TMP_CFG}"' EXIT
@@ -20,5 +21,9 @@ eksctl create cluster -f "${TMP_CFG}"
 
 aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}" >/dev/null
 kubectl get ns >/dev/null
+
+if [ "${INSTALL_CORE_ADDONS}" = "true" ]; then
+  "${SCRIPT_DIR}/install-core-addons.sh"
+fi
 
 echo "EKS cluster ready: ${CLUSTER_NAME} (${AWS_REGION})"

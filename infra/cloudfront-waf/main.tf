@@ -17,6 +17,17 @@ variable "origin_domain_name" {
   type        = string
 }
 
+variable "origin_protocol_policy" {
+  description = "CloudFront to origin protocol policy"
+  type        = string
+  default     = "http-only"
+
+  validation {
+    condition     = contains(["http-only", "https-only", "match-viewer"], var.origin_protocol_policy)
+    error_message = "origin_protocol_policy must be one of: http-only, https-only, match-viewer."
+  }
+}
+
 locals {
   name_prefix = "openedx-prod"
 }
@@ -81,7 +92,7 @@ resource "aws_cloudfront_distribution" "this" {
     custom_origin_config {
       http_port              = 80
       https_port             = 443
-      origin_protocol_policy = "http-only"
+      origin_protocol_policy = var.origin_protocol_policy
       origin_ssl_protocols   = ["TLSv1.2"]
     }
   }

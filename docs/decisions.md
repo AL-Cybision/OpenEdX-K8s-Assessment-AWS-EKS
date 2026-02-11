@@ -93,6 +93,7 @@ HPA:
 - Choice: HPA on `lms` and `cms` (min=2, max=6, CPU=70%)
 - Rationale: required by assessment; demonstrates auto-scaling behavior under load
 - Dependency: CPU-based HPA requires resource requests/limits and metrics-server
+- Implementation detail: default deployment requests are tuned for reproducibility on `2 x t3.large`; for peak load screenshots, nodegroup desired size can be temporarily raised to 3
 
 Health checks:
 - Choice: liveness/readiness probes injected by post-render filter
@@ -108,6 +109,7 @@ CloudFront + WAF:
 - Rationale: meets requirement and provides simple, unambiguous proof (HTTP/2 403)
 - Tradeoff: without real DNS/hostnames, default CloudFront requests can return 404 due to Ingress host routing
 - Origin protocol: CloudFront uses HTTP-to-origin (`origin_protocol_policy = "http-only"`) because the NGINX Ingress uses a self-signed certificate for placeholder domains and CloudFront requires a publicly trusted cert for HTTPS-to-origin
+- Hardening path: `infra/cloudfront-waf/apply.sh` supports `ORIGIN_PROTOCOL_POLICY=https-only` once a trusted origin certificate is in place
 
 ## What Would Be Hardened For Real Production (Not Required For Assessment)
 

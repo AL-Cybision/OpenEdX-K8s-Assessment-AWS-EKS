@@ -76,6 +76,11 @@ Fix (re-apply requests/limits + HPAs):
 infra/k8s/05-hpa/apply.sh
 ```
 
+If metrics are missing:
+```bash
+infra/eksctl/install-core-addons.sh
+```
+
 ## 4) External DB Connectivity Fails From Pods
 
 Symptoms:
@@ -160,10 +165,7 @@ Cause:
 
 Fix:
 ```bash
-kubectl get storageclass
-kubectl get storageclass gp2 >/dev/null 2>&1 && \
-  kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
-kubectl patch storageclass gp3 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+infra/eksctl/install-core-addons.sh
 kubectl -n openedx-prod delete pvc meilisearch
 infra/k8s/04-tutor-apply/apply.sh
 ```
