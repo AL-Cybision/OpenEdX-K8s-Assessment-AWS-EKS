@@ -13,3 +13,7 @@ __pycache__/
 **/*.tfstate.*
 **/tfplan
 **/*.tfplan
+
+# Local assessment docs (keep local, do not commit)
+Assignment.md
+Mandatory Clarifications & Enforcement Criteria.docx
