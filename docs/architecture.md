@@ -209,8 +209,10 @@ flowchart TD
   A2 --> A3["3 WAF rule evaluation"]
   A3 -->|allowed| A4["4 Forward to NLB origin"]
   A3 -->|blocked header x block me equals 1| A403["HTTP 403"]
+  A1 -. direct validation path .-> A4B["4b Direct to NLB for validation"]
 
   A4 --> A5["5 NGINX Ingress host routing"]
+  A4B --> A5
   A5 --> A6["LMS CMS MFE service"]
   A6 --> A7["6 Pod business logic"]
 
@@ -238,4 +240,5 @@ flowchart TD
 - CloudFront default domain (e.g. `d123.cloudfront.net`) does not match the Ingress host rules (`lms.openedx.local`, `studio.openedx.local`), so a default request can return 404. WAF proof uses a header-based block rule (403) which is independent of host routing.
 - CloudFront origin is configured as HTTP-only in Terraform (`origin_protocol_policy = "http-only"`) because the origin uses a self-signed certificate for placeholder domains. CloudFront requires a publicly trusted origin certificate for HTTPS-to-origin.
 - TLS termination at NGINX Ingress is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local` (placeholder domains mapped locally).
+- `mfe` service may be exposed internally as `NodePort` by Tutor defaults, but external client traffic is still routed through NGINX Ingress host rules (`apps.lms.openedx.local`).
 - For real production you would use real DNS + ACM certificates, configure CloudFront alternate domain names that match the Ingress hosts, and switch CloudFront to HTTPS-to-origin.
