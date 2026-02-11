@@ -107,52 +107,130 @@ Security note:
 ## Architecture Diagram
 
 ```mermaid
-graph LR
-  WAF[AWS WAF] --> CF[CloudFront]
-  CF --> NLB[AWS NLB (ingress-nginx Service)]
-  NLB --> NGINX[NGINX Ingress Controller]
-  NGINX --> LMS[LMS Pod]
-  NGINX --> CMS[CMS Pod]
-  NGINX --> MFE[MFE Pod]
+flowchart LR
+  USER[User / Browser]
+  WAF[AWS WAF]
+  CF[CloudFront]
+  NLB[AWS NLB (ingress-nginx Service)]
 
-  LMS --> RDS[(RDS MySQL)]
-  LMS --> MONGO[(MongoDB EC2)]
-  LMS --> REDIS[(Redis EC2)]
-  LMS --> ES[(Elasticsearch EC2)]
+  USER --> CF
+  WAF -. attached to .-> CF
+  USER -. direct validation path .-> NLB
+  CF --> NLB
 
+  subgraph VPC[VPC (us-east-1)]
+    direction LR
+
+    subgraph PUB[Public subnets]
+      NLB
+    end
+
+    subgraph PRIV[Private subnets]
+      direction LR
+
+      subgraph EKS[EKS Cluster: openedx-eks]
+        direction TB
+
+        subgraph INGRESS[Namespace: ingress-nginx]
+          NGX[NGINX Ingress Controller]
+        end
+
+        subgraph APP[Namespace: openedx-prod]
+          LMS[LMS]
+          CMS[CMS / Studio]
+          MFE[MFE]
+          LMSW[LMS Worker]
+          CMSW[CMS Worker]
+          SMTP[SMTP]
+          MEILI[Meilisearch]
+          HPA[HPA lms/cms]
+        end
+
+        subgraph OBS[Namespace: observability]
+          PROM[Prometheus]
+          GRAF[Grafana]
+          LOKI[Loki]
+          ALERT[Alertmanager]
+        end
+      end
+
+      subgraph DATA[External data layer (outside Kubernetes, private)]
+        RDS[(RDS MySQL 8.0)]
+        MONGO[(MongoDB EC2)]
+        REDIS[(Redis EC2)]
+        ES[(Elasticsearch EC2)]
+      end
+
+      subgraph STORAGE[Storage layer]
+        EFS[(EFS RWX openedx-media)]
+        EBS[(EBS gp3 RWO meilisearch)]
+      end
+    end
+  end
+
+  NLB --> NGX
+  NGX --> LMS
+  NGX --> CMS
+  NGX --> MFE
+
+  LMS --> RDS
+  LMS --> MONGO
+  LMS --> REDIS
+  LMS --> ES
+  LMSW --> REDIS
+  LMSW --> RDS
+  LMSW --> MONGO
   CMS --> RDS
   CMS --> MONGO
   CMS --> REDIS
   CMS --> ES
+  CMSW --> REDIS
+  CMSW --> RDS
+  CMSW --> MONGO
 
-  LMS --> MEDIA[(EFS RWX media PVC)]
-  CMS --> MEDIA
+  LMS --> EFS
+  CMS --> EFS
+  MEILI --> EBS
 
-  MEILI[Meilisearch Pod] --> EBS[(EBS gp3 PVC)]
+  LMS -. metrics/logs .-> PROM
+  CMS -. metrics/logs .-> PROM
+  LMSW -. logs .-> LOKI
+  CMSW -. logs .-> LOKI
+  GRAF --> PROM
+  GRAF --> LOKI
+  PROM --> ALERT
 ```
 
 ## Network Flow Diagram
 
 ```mermaid
-graph TD
-  User[User] --> WAF[AWS WAF]
-  WAF --> CF[CloudFront]
-  CF --> NLB[AWS NLB (LoadBalancer)]
-  NLB --> NGINX[NGINX Ingress]
-  NGINX --> LMS[LMS Service]
-  NGINX --> CMS[CMS Service]
+flowchart TD
+  A1[1. User request] --> A2[2. CloudFront edge]
+  A2 --> A3[3. WAF rule evaluation]
+  A3 -->|allowed| A4[4. Forward to NLB origin]
+  A3 -->|blocked header X-Block-Me:1| A403[HTTP 403]
 
-  subgraph Private Subnets
-    LMS --> RDS[(RDS MySQL)]
-    LMS --> MONGO[(MongoDB EC2)]
-    LMS --> REDIS[(Redis EC2)]
-    LMS --> ES[(Elasticsearch EC2)]
-  end
+  A4 --> A5[5. NGINX Ingress host routing]
+  A5 --> A6[LMS/CMS/MFE service]
+  A6 --> A7[6. Pod business logic]
 
-  LMS --> MEDIA[(EFS RWX media PVC)]
-  CMS --> MEDIA
+  A7 --> D1[(RDS MySQL:3306)]
+  A7 --> D2[(MongoDB:27017)]
+  A7 --> D3[(Redis:6379)]
+  A7 --> D4[(Elasticsearch:9200)]
+  A7 --> D5[(EFS media:2049)]
+  A7 --> D6[(Meilisearch PVC on EBS)]
 
-  MEILI[Meilisearch] --> EBS[(EBS gp3 PVC)]
+  A7 -. metrics .-> O1[Prometheus]
+  A7 -. logs .-> O2[Loki]
+  O1 --> O3[Grafana dashboards]
+  O2 --> O3
+
+  D1 --> B1[Backup path: RDS snapshot]
+  D2 --> B2[Backup path: EBS snapshot]
+  D3 --> B3[Backup path: EBS snapshot]
+  D4 --> B4[Backup path: EBS snapshot]
+  D5 --> B5[Backup path: EFS backup policy]
 ```
 
 ## Notes (Assessment vs Real Production)
