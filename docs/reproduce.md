@@ -223,6 +223,9 @@ infra/cloudfront-waf/apply.sh
 infra/cloudfront-waf/verify.sh
 ```
 
+Rerun note:
+- `infra/cloudfront-waf/apply.sh` auto-imports existing OpenEdX CloudFront/WAF resources if local Terraform state is missing, to avoid duplicate-name failures in reused assessor accounts.
+
 Production-hardening option (when ingress has a publicly trusted certificate):
 ```bash
 ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh

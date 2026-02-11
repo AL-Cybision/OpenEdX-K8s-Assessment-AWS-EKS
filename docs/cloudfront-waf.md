@@ -6,6 +6,10 @@
 infra/cloudfront-waf/apply.sh
 ```
 
+Rerun behavior:
+- If CloudFront/WAF already exist in the account but local Terraform state is missing, `apply.sh` auto-imports them before planning/applying.
+- This prevents `WAFDuplicateItemException` during assessor reruns in reused environments.
+
 Origin protocol note:
 - This repo uses `origin_protocol_policy = "http-only"` (CloudFront -> origin over HTTP).
 - Reason: the NGINX Ingress uses a **self-signed** certificate for placeholder domains (`*.openedx.local`), and CloudFront requires a publicly trusted certificate for HTTPS-to-origin.

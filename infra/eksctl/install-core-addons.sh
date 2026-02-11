@@ -69,9 +69,17 @@ fi
 echo "Installing metrics-server (required for CPU-based HPA)..."
 helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server >/dev/null 2>&1 || true
 helm repo update >/dev/null
+
+TMP_VALUES="$(mktemp)"
+trap 'rm -f "${TMP_VALUES}"' EXIT
+cat > "${TMP_VALUES}" <<'YAML'
+args:
+  - --kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP
+YAML
+
 helm upgrade --install metrics-server metrics-server/metrics-server \
   --namespace kube-system \
-  --set args[0]=--kubelet-preferred-address-types=InternalIP,Hostname,ExternalIP >/dev/null
+  --values "${TMP_VALUES}" >/dev/null
 
 kubectl -n kube-system rollout status deploy/metrics-server --timeout=5m
 
