@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+import os
 import sys
+import re
 
 try:
     import yaml
@@ -12,20 +14,23 @@ DROP_KINDS = {"Deployment", "Service", "ConfigMap", "PersistentVolumeClaim", "Jo
 # by the MFE container image) so the MFE pod can start.
 DROP_NAME_PREFIXES = ("caddy",)
 
+LMS_HOST = os.environ.get("LMS_HOST", "lms.openedx.local")
+CMS_HOST = os.environ.get("CMS_HOST", "studio.openedx.local")
+
 PROBE_CONFIG = {
     "lms": {
         "type": "http",
         "port": 8000,
         "path": "/heartbeat",
         "delay": 60,
-        "host_header": "lms.openedx.local",
+        "host_header": LMS_HOST,
     },
     "cms": {
         "type": "http",
         "port": 8000,
         "path": "/heartbeat",
         "delay": 60,
-        "host_header": "studio.openedx.local",
+        "host_header": CMS_HOST,
     },
     "mfe": {"type": "http", "port": 8002, "path": "/", "delay": 20},
     "meilisearch": {"type": "http", "port": 7700, "path": "/health", "delay": 20},
@@ -38,6 +43,8 @@ MEDIA_PVC_NAME = "openedx-media"
 MEDIA_VOLUME_NAME = "openedx-media"
 MEDIA_MOUNT_PATH = "/openedx/media"
 MFE_SERVICE_NAME = "mfe"
+MFE_CADDY_CONFIGMAP_PREFIX = "mfe-caddy-config"
+LEARNER_DASHBOARD_REDIRECT_URL = f"https://{LMS_HOST}/dashboard"
 
 
 def build_probe(cfg: dict) -> dict:
@@ -117,6 +124,51 @@ def normalize_service_types(doc: dict) -> None:
         port.pop("nodePort", None)
 
 
+def patch_mfe_caddyfile(doc: dict) -> None:
+    if doc.get("kind") != "ConfigMap":
+        return
+    meta = doc.get("metadata") or {}
+    name = meta.get("name", "")
+    if not name.startswith(MFE_CADDY_CONFIGMAP_PREFIX):
+        return
+
+    data = doc.setdefault("data", {})
+    caddyfile = data.get("Caddyfile")
+    if not isinstance(caddyfile, str):
+        return
+
+    redirect_block = (
+        "    @mfe_learner-dashboard {\n"
+        "        path /learner-dashboard /learner-dashboard/*\n"
+        "    }\n"
+        f"    redir @mfe_learner-dashboard {LEARNER_DASHBOARD_REDIRECT_URL} 302\n"
+    )
+
+    # Replace learner-dashboard static handle with redirect to LMS dashboard.
+    learner_dashboard_handle_pattern = re.compile(
+        r"\n\s*@mfe_learner-dashboard\s*\{\s*path /learner-dashboard /learner-dashboard/\*\s*\}\s*"
+        r"handle @mfe_learner-dashboard \{\s*uri strip_prefix /learner-dashboard\s*"
+        r"root \* /openedx/dist/learner-dashboard\s*try_files /\{path\} /index\.html\s*"
+        r"file_server\s*\}\s*\n",
+        re.MULTILINE,
+    )
+
+    if learner_dashboard_handle_pattern.search(caddyfile):
+        data["Caddyfile"] = learner_dashboard_handle_pattern.sub("\n" + redirect_block + "\n", caddyfile)
+        return
+
+    # If upstream template changes and no learner-dashboard block is found,
+    # insert redirect once after the mfe_config proxy section.
+    if "redir @mfe_learner-dashboard" not in caddyfile:
+        anchor = "reverse_proxy /api/mfe_config/v1* lms:8000 {\n"
+        idx = caddyfile.find(anchor)
+        if idx != -1:
+            end = caddyfile.find("}\n", idx)
+            if end != -1:
+                insert_at = end + 2
+                data["Caddyfile"] = caddyfile[:insert_at] + "\n" + redirect_block + "\n" + caddyfile[insert_at:]
+
+
 def should_drop(doc: dict) -> bool:
     if not isinstance(doc, dict):
         return False
@@ -143,6 +195,7 @@ for d in in_docs:
     add_probes(d)
     add_media_mounts(d)
     normalize_service_types(d)
+    patch_mfe_caddyfile(d)
     out_docs.append(d)
 
 yaml.safe_dump_all(out_docs, sys.stdout, sort_keys=False)

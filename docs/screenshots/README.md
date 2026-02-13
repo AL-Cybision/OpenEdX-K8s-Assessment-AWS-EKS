@@ -8,7 +8,7 @@ Place screenshots in this folder using these exact filenames:
 4. `mfe-service-clusterip.png` — `kubectl -n openedx-prod get svc mfe -o wide` (type `ClusterIP`)
 5. `OpenEdxLMS.png` — Browser: LMS UI loads (Welcome to My Open edX)
 6. `studio-course-created.png` — Studio UI with created course visible
-7. `mongo-course-persistence.png` — `kubectl -n openedx-prod logs mongo-verify` showing course/modulestore-related collections
+7. `mongo-course-persistence.png` — `kubectl -n openedx-prod exec deploy/lms -- python manage.py ...` showing course/modulestore-related collections (no secrets printed)
 8. `course-persistence-after-restart.png` — Same course visible after LMS/CMS restart
 9. `rds-private-endpoint.png` — RDS instance details showing endpoint + private networking / not public
 10. `ec2-private-ips.png` — EC2 instances (mongo/redis/es) showing private IPs, no public IPv4

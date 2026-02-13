@@ -88,18 +88,7 @@ PY
 Notes:
 - Redis password is **URL-encoded** to keep Celery broker URLs valid.
 - Set `REDIS_USERNAME=default` so Tutor includes credentials in rendered `redis://` URLs (Redis ACL default user + `requirepass`).
-- Meilisearch API key is aligned with the master key to avoid init failures:
-
-```bash
-MEILI_MASTER=$(python3 - <<'PY'
-import yaml
-from pathlib import Path
-cfg = Path.home().joinpath('.local/share/tutor/config.yml').read_text()
-print(yaml.safe_load(cfg)['MEILISEARCH_MASTER_KEY'])
-PY
-)
-.venv/bin/tutor config save -s MEILISEARCH_API_KEY="$MEILI_MASTER"
-```
+- Meilisearch key alignment is handled automatically by `infra/k8s/04-tutor-apply/apply.sh` (no secrets printed).
 
 ## StorageClass Fix (Meilisearch PVC)
 

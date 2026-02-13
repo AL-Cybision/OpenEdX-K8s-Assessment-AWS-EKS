@@ -67,17 +67,19 @@ kubectl -n openedx-prod delete pod verify-net --ignore-not-found
 
 ### Verify Mongo collections for course/modulestore
 ```bash
-MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
-MONGO_IP=$(terraform -chdir=infra/terraform output -raw mongo_private_ip)
-MONGO_JSON=$(aws secretsmanager get-secret-value --secret-id "$MONGO_SECRET_ARN" --query SecretString --output text)
-MONGO_USER=$(echo "$MONGO_JSON" | jq -r '.app_username')
-MONGO_PASS=$(echo "$MONGO_JSON" | jq -r '.app_password')
-
-kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
-kubectl -n openedx-prod run mongo-verify --image=mongo:6 --restart=Never -- \
-  sh -c "mongosh \"mongodb://${MONGO_USER}:${MONGO_PASS}@${MONGO_IP}:27017/openedx?authSource=openedx\" --quiet --eval 'db.getCollectionNames().filter(n => /modulestore|course/i.test(n)).slice(0,20)'"
-kubectl -n openedx-prod logs mongo-verify
-kubectl -n openedx-prod delete pod mongo-verify --ignore-not-found
+kubectl -n openedx-prod exec deploy/lms -- bash -lc 'cd /openedx/edx-platform && \
+python manage.py lms shell --no-imports --command "\
+import re; \
+from django.conf import settings; \
+from pymongo import MongoClient; \
+conf=settings.CONTENTSTORE[\"DOC_STORE_CONFIG\"]; \
+client=MongoClient(conf[\"host\"], int(conf.get(\"port\", 27017)), \
+  username=conf.get(\"user\"), password=conf.get(\"password\"), \
+  authSource=conf.get(\"authsource\") or conf.get(\"db\") or \"admin\", \
+  tls=bool(conf.get(\"ssl\", False))); \
+db=client[conf[\"db\"]]; \
+names=[n for n in db.list_collection_names() if re.search(r\"modulestore|course\", n, re.I)]; \
+print(names[:20])"'
 ```
 - Screenshot: `mongo-verify` logs show course/modulestore-related collections
 - File: `docs/screenshots/mongo-course-persistence.png`

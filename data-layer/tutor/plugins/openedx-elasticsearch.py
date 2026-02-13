@@ -9,14 +9,14 @@ hooks.Filters.CONFIG_DEFAULTS.add_item(("ELASTICSEARCH_HOST", "http://elasticsea
 LMS_PATCH = """\
 # Enable Elasticsearch as the search backend
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
+ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
 """
 
 CMS_PATCH = """\
 # Enable Elasticsearch as the search backend
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
+ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
 """
 

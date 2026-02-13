@@ -13,17 +13,67 @@ LMS_PATCH = """\
 CORS_ORIGIN_WHITELIST.append("https://apps.{{ LMS_HOST }}")
 CSRF_TRUSTED_ORIGINS.append("https://apps.{{ LMS_HOST }}")
 
+# Keep host-level URLs aligned with HTTPS ingress hostnames.
+LMS_ROOT_URL = "https://{{ LMS_HOST }}"
+CMS_ROOT_URL = "https://{{ CMS_HOST }}"
+
+# The learner-dashboard MFE in the stock Tutor MFE image may lack reliable runtime
+# config injection when using placeholder local domains. Disable redirect-to-MFE
+# to avoid /dashboard <-> /learner-dashboard loops and keep the classic dashboard.
+LEARNER_HOME_MFE_REDIRECT_PERCENTAGE = 0
+
+# The AuthN MFE (apps.{{ LMS_HOST }}/authn/*) can be fragile in "assessment/staging"
+# environments and may trigger browser redirect loops. Keep the classic LMS login/register.
+FEATURES['ENABLE_AUTHN_MICROFRONTEND'] = False
+
 # Force MFE config API URLs to use HTTPS to avoid mixed-content browser blocks.
 def _openedx_force_https(url):
-    if isinstance(url, str) and url.startswith("http://"):
+    if not isinstance(url, str):
+        return url
+    # Keep API paths as-is (for example "/csrf/api/v1/token").
+    if url.startswith("/"):
+        return url
+    if url.startswith("http://"):
         return "https://" + url[len("http://"):]
+    if url.startswith("https://"):
+        return url
+    # Some Tutor defaults are hostnames without scheme (for example BASE_URL).
+    # Normalize those to absolute HTTPS URLs to avoid frontend runtime issues.
+    if url:
+        return "https://" + url.lstrip("/")
     return url
 
 # MFE_CONFIG should exist in LMS settings, but guard to avoid breaking startup if
 # upstream changes.
 if "MFE_CONFIG" in globals():
+    if not MFE_CONFIG.get("BASE_URL"):
+        MFE_CONFIG["BASE_URL"] = "apps.{{ LMS_HOST }}"
+    # Empty CREDENTIALS_BASE_URL can lead to broken MFE API calls.
+    if not MFE_CONFIG.get("CREDENTIALS_BASE_URL"):
+        MFE_CONFIG["CREDENTIALS_BASE_URL"] = "https://{{ LMS_HOST }}"
+    # Provide explicit defaults expected by Indigo MFEs to avoid blank screens
+    # due to missing config keys.
+    if not MFE_CONFIG.get("SUPPORT_EMAIL"):
+        MFE_CONFIG["SUPPORT_EMAIL"] = CONTACT_EMAIL
+    if not MFE_CONFIG.get("TERMS_OF_SERVICE_URL"):
+        MFE_CONFIG["TERMS_OF_SERVICE_URL"] = "https://{{ LMS_HOST }}/tos"
+    if not MFE_CONFIG.get("PRIVACY_POLICY_URL"):
+        MFE_CONFIG["PRIVACY_POLICY_URL"] = "https://{{ LMS_HOST }}/privacy"
+    if not MFE_CONFIG.get("CREDIT_PURCHASE_URL"):
+        MFE_CONFIG["CREDIT_PURCHASE_URL"] = "https://{{ LMS_HOST }}/dashboard"
+    if not MFE_CONFIG.get("ORDER_HISTORY_URL"):
+        MFE_CONFIG["ORDER_HISTORY_URL"] = "https://{{ LMS_HOST }}/dashboard"
+    if "ENABLE_ACCESSIBILITY_PAGE" not in MFE_CONFIG:
+        MFE_CONFIG["ENABLE_ACCESSIBILITY_PAGE"] = False
     for _k, _v in list(MFE_CONFIG.items()):
-        MFE_CONFIG[_k] = _openedx_force_https(_v)
+        # Only normalize known URL-like keys and endpoint URLs.
+        if (
+            _k == "BASE_URL"
+            or _k.endswith("_URL")
+            or _k.endswith("_BASE_URL")
+            or _k.endswith("_ENDPOINT")
+        ):
+            MFE_CONFIG[_k] = _openedx_force_https(_v)
 
 # These variables exist on recent Open edX versions, but guard for safety.
 for _name in (
