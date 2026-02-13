@@ -12,6 +12,7 @@
 - `docs/architecture.md` — Architecture + network flow diagrams
 - `docs/troubleshooting.md` — Common issues and fixes
 - `docs/decisions.md` — Configuration decisions and rationale
+- `docs/references.md` — Upstream docs used as reference (Open edX, Tutor, AWS EKS, Kubernetes)
 - `docs/config-artifacts.md` — Artifact mapping (files to rubric checklist)
 - `docs/reproduce.md` — Assessor-friendly reproduction runbook (script-driven)
 - `infra/eksctl/` — Optional: EKS cluster creation/deletion automation (eksctl)
