@@ -16,3 +16,4 @@
 - `docs/config-artifacts.md` — Artifact mapping (files to rubric checklist)
 - `docs/reproduce.md` — Assessor-friendly reproduction runbook (script-driven)
 - `infra/eksctl/` — Optional: EKS cluster creation/deletion automation (eksctl)
+- `docs/upstream-guidance.md` — Research summary: upstream docs and how this repo applies best practices

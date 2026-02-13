@@ -6,6 +6,7 @@ This repository contains the infrastructure, configuration, and documentation fo
 
 - `docs/README.md`
 - External references (upstream docs): `docs/references.md`
+- Research summary (upstream best practices): `docs/upstream-guidance.md`
 - Reproduction runbook: `docs/reproduce.md`
 - Optional: cluster automation: `infra/eksctl/`
 - Configuration artifacts index: `docs/config-artifacts.md`

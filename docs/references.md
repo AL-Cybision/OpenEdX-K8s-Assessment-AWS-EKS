@@ -11,9 +11,14 @@ This repo is self-contained for reproduction (`docs/reproduce.md`), but the link
 - https://docs.openedx.org/en/latest/community/release_notes/index.html
 - https://docs.openedx.org/en/latest/community/release_notes/ulmo.html
 - https://openedx.atlassian.net/wiki/spaces/COMM/pages/3613392957/Open+edX+release+schedule
+- Open edX Proposals (architecture direction: containers + operator-managed config):
+  - https://docs.openedx.org/projects/openedx-proposals/en/latest/architectural-decisions/oep-0045-arch-ops-and-config.html
+  - https://docs.openedx.org/projects/openedx-proposals/en/latest/architectural-decisions/oep-0045/decisions/0001-tutor-as-replacement-for-edx-configuration.html
 
 ## Tutor (Operator Manual)
 
+- Versioning / release mapping:
+  - https://docs.tutor.edly.io/reference/openedx-releases.html
 - https://docs.tutor.edly.io/install.html
 - https://docs.tutor.edly.io/configuration.html
 - https://docs.tutor.edly.io/k8s.html
@@ -24,12 +29,18 @@ This repo is self-contained for reproduction (`docs/reproduce.md`), but the link
 
 - https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html
 - https://docs.aws.amazon.com/eks/latest/userguide/alb-ingress.html
+- EBS CSI driver add-on:
+  - https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html
 - https://kubernetes-sigs.github.io/aws-load-balancer-controller/
 - https://github.com/kubernetes-sigs/aws-load-balancer-controller
 
 ## Kubernetes Ingress Fundamentals
 
 - https://kubernetes.io/docs/concepts/services-networking/ingress/
+- ingress-nginx docs:
+  - https://kubernetes.github.io/ingress-nginx/
+- cert-manager docs (Let’s Encrypt on Kubernetes):
+  - https://cert-manager.io/docs/
 
 ## Production Blueprints
 
