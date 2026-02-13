@@ -44,7 +44,6 @@ MEDIA_VOLUME_NAME = "openedx-media"
 MEDIA_MOUNT_PATH = "/openedx/media"
 MFE_SERVICE_NAME = "mfe"
 MFE_CADDY_CONFIGMAP_PREFIX = "mfe-caddy-config"
-LEARNER_DASHBOARD_REDIRECT_URL = f"https://{LMS_HOST}/dashboard"
 
 
 def build_probe(cfg: dict) -> dict:
@@ -124,7 +123,12 @@ def normalize_service_types(doc: dict) -> None:
         port.pop("nodePort", None)
 
 
-def patch_mfe_caddyfile(doc: dict) -> None:
+def validate_mfe_caddy_configmap(doc: dict) -> None:
+    """
+    Tutor's MFE image uses an internal Caddy to serve static files. We must not
+    rewrite its Caddyfile to "fix" auth flows; doing so can create redirect
+    loops when combined with LMS/MFE routing.
+    """
     if doc.get("kind") != "ConfigMap":
         return
     meta = doc.get("metadata") or {}
@@ -136,37 +140,11 @@ def patch_mfe_caddyfile(doc: dict) -> None:
     caddyfile = data.get("Caddyfile")
     if not isinstance(caddyfile, str):
         return
-
-    redirect_block = (
-        "    @mfe_learner-dashboard {\n"
-        "        path /learner-dashboard /learner-dashboard/*\n"
-        "    }\n"
-        f"    redir @mfe_learner-dashboard {LEARNER_DASHBOARD_REDIRECT_URL} 302\n"
-    )
-
-    # Replace learner-dashboard static handle with redirect to LMS dashboard.
-    learner_dashboard_handle_pattern = re.compile(
-        r"\n\s*@mfe_learner-dashboard\s*\{\s*path /learner-dashboard /learner-dashboard/\*\s*\}\s*"
-        r"handle @mfe_learner-dashboard \{\s*uri strip_prefix /learner-dashboard\s*"
-        r"root \* /openedx/dist/learner-dashboard\s*try_files /\{path\} /index\.html\s*"
-        r"file_server\s*\}\s*\n",
-        re.MULTILINE,
-    )
-
-    if learner_dashboard_handle_pattern.search(caddyfile):
-        data["Caddyfile"] = learner_dashboard_handle_pattern.sub("\n" + redirect_block + "\n", caddyfile)
-        return
-
-    # If upstream template changes and no learner-dashboard block is found,
-    # insert redirect once after the mfe_config proxy section.
-    if "redir @mfe_learner-dashboard" not in caddyfile:
-        anchor = "reverse_proxy /api/mfe_config/v1* lms:8000 {\n"
-        idx = caddyfile.find(anchor)
-        if idx != -1:
-            end = caddyfile.find("}\n", idx)
-            if end != -1:
-                insert_at = end + 2
-                data["Caddyfile"] = caddyfile[:insert_at] + "\n" + redirect_block + "\n" + caddyfile[insert_at:]
+    if "redir @mfe_learner-dashboard" in caddyfile:
+        sys.stderr.write(
+            f"Refusing to apply: unexpected learner-dashboard redirect in {name} Caddyfile.\n"
+        )
+        sys.exit(2)
 
 
 def should_drop(doc: dict) -> bool:
@@ -195,7 +173,7 @@ for d in in_docs:
     add_probes(d)
     add_media_mounts(d)
     normalize_service_types(d)
-    patch_mfe_caddyfile(d)
+    validate_mfe_caddy_configmap(d)
     out_docs.append(d)
 
 yaml.safe_dump_all(out_docs, sys.stdout, sort_keys=False)
