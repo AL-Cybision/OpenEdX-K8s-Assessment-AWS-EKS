@@ -9,9 +9,19 @@ NAMESPACE="${NAMESPACE:-openedx-prod}"
 TUTOR_ENV_DIR="${TUTOR_ENV_DIR:-${HOME}/.local/share/tutor/env}"
 LMS_HOST="${LMS_HOST:-lms.openedx.local}"
 CMS_HOST="${CMS_HOST:-studio.openedx.local}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+TUTOR_PLUGINS_DIR="${TUTOR_PLUGINS_DIR:-${HOME}/.local/share/tutor-plugins}"
 
 # Ensure post-render scripts (python) see these values even when defaults are used.
 export LMS_HOST CMS_HOST
+
+# Ensure custom plugins are the ones from this repo (avoid stale copies in $HOME).
+mkdir -p "${TUTOR_PLUGINS_DIR}"
+cp -f "${REPO_ROOT}/data-layer/tutor/plugins/openedx-mfe-https.py" "${TUTOR_PLUGINS_DIR}/openedx-mfe-https.py"
+
+# We terminate TLS at NGINX Ingress; Open edX must behave as HTTPS behind a proxy.
+"${TUTOR_BIN}" config save -s LMS_HOST="${LMS_HOST}" -s CMS_HOST="${CMS_HOST}" -s ENABLE_HTTPS=true >/dev/null
 
 "${TUTOR_BIN}" config save --env-only
 

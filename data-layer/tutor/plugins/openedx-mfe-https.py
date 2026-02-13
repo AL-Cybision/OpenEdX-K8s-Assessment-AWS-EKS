@@ -17,6 +17,23 @@ CSRF_TRUSTED_ORIGINS.append("https://apps.{{ LMS_HOST }}")
 LMS_ROOT_URL = "https://{{ LMS_HOST }}"
 CMS_ROOT_URL = "https://{{ CMS_HOST }}"
 
+# Cookie + session hardening (prevents cross-subdomain auth redirect loops).
+# The default Tutor config sets SESSION_COOKIE_DOMAIN to the LMS host, which
+# breaks SSO between lms/studio/apps subdomains and can manifest as browser-only
+# redirect loops. Use the registrable domain (".example.com").
+def _openedx_cookie_domain(hostname: str) -> str | None:
+    if not isinstance(hostname, str):
+        return None
+    parts = [p for p in hostname.split(".") if p]
+    if len(parts) < 2:
+        return None
+    return "." + ".".join(parts[1:])
+
+SESSION_COOKIE_DOMAIN = _openedx_cookie_domain(LMS_BASE)
+CSRF_COOKIE_DOMAIN = SESSION_COOKIE_DOMAIN
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+
 # The learner-dashboard MFE in the stock Tutor MFE image may lack reliable runtime
 # config injection when using placeholder local domains. Disable redirect-to-MFE
 # to avoid /dashboard <-> /learner-dashboard loops and keep the classic dashboard.
@@ -91,6 +108,20 @@ CMS_PATCH = """\
 # Allow MFEs served over HTTPS (TLS terminated at NGINX Ingress).
 CORS_ORIGIN_WHITELIST.append("https://apps.{{ LMS_HOST }}")
 CSRF_TRUSTED_ORIGINS.append("https://apps.{{ LMS_HOST }}")
+
+# Match LMS cookie domain so Studio and LMS share sessions.
+def _openedx_cookie_domain(hostname: str) -> str | None:
+    if not isinstance(hostname, str):
+        return None
+    parts = [p for p in hostname.split(".") if p]
+    if len(parts) < 2:
+        return None
+    return "." + ".".join(parts[1:])
+
+SESSION_COOKIE_DOMAIN = _openedx_cookie_domain(LMS_BASE)
+CSRF_COOKIE_DOMAIN = SESSION_COOKIE_DOMAIN
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
 
 # Force MFE-related URLs to use HTTPS to avoid mixed-content browser blocks.
 def _openedx_force_https(url):
