@@ -2,8 +2,11 @@
 
 This repository contains the infrastructure, configuration, and documentation for deploying Open edX on AWS EKS with external data services, NGINX ingress, observability, and CloudFront + WAF.
 
+Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Meilisearch is disabled; MySQL/Mongo/Redis/Elasticsearch are external and private-only).
+
 ## Documentation
 
+- `AGENTS.md` (agent/human operating guide: what/why/where/how/when)
 - `docs/README.md`
 - External references (upstream docs): `docs/references.md`
 - Research summary (upstream best practices): `docs/upstream-guidance.md`

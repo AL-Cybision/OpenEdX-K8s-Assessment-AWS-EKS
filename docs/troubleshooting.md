@@ -158,16 +158,16 @@ OIDC Terraform error (media-efs):
 - Symptom: `expected "url" to have a host, got oidc.eks...`
 - Fix: `infra/media-efs/data-sources.tf` must use the full issuer URL (do not strip `https://`).
 
-## 8) Meilisearch PVC Pending
+## 8) Default StorageClass / EBS CSI Missing
 
 Cause:
-- no default StorageClass
+- EBS CSI driver not installed, or no default StorageClass (for example `gp3` not set as default)
 
 Fix:
 ```bash
 infra/eksctl/install-core-addons.sh
-kubectl -n openedx-prod delete pvc meilisearch
-infra/k8s/04-tutor-apply/apply.sh
+infra/k8s/02-storage/apply.sh
+kubectl get storageclass
 ```
 
 ## 9) Grafana Port-Forward Fails (Connection Refused)

@@ -50,7 +50,7 @@ How this repo applies it:
 ### D) Kubernetes: storage and metrics are not optional for “production-ish”
 
 The practical minimum for this assessment stack:
-- **EBS CSI driver** installed (for default dynamic storage and Meilisearch PVC).
+- **EBS CSI driver** installed (baseline dynamic storage; `gp3` as default StorageClass).
 - A default StorageClass set (we use `gp3`).
 - **metrics-server** installed (HPA needs CPU metrics).
 - RWX shared media for LMS/CMS (we use EFS RWX to satisfy “shared PVC” and multi-replica LMS/CMS).
@@ -77,4 +77,3 @@ Use upstream docs as “why/how deeper” references:
 If you hit redirect/auth/MFE issues:
 - Start with the Tutor “behind a proxy” guide.
 - Then review the Discuss threads linked in `docs/references.md`.
-

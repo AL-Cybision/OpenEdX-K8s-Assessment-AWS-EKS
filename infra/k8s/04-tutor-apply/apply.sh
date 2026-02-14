@@ -19,6 +19,10 @@ export LMS_HOST CMS_HOST
 # Ensure custom plugins are the ones from this repo (avoid stale copies in $HOME).
 mkdir -p "${TUTOR_PLUGINS_DIR}"
 cp -f "${REPO_ROOT}/data-layer/tutor/plugins/openedx-mfe-https.py" "${TUTOR_PLUGINS_DIR}/openedx-mfe-https.py"
+cp -f "${REPO_ROOT}/data-layer/tutor/plugins/openedx-elasticsearch.py" "${TUTOR_PLUGINS_DIR}/openedx-elasticsearch.py"
+
+# Enable required local plugins (idempotent).
+"${TUTOR_BIN}" plugins enable openedx-mfe-https openedx-elasticsearch >/dev/null
 
 # We terminate TLS at NGINX Ingress; Open edX must behave as HTTPS behind a proxy.
 "${TUTOR_BIN}" config save -s LMS_HOST="${LMS_HOST}" -s CMS_HOST="${CMS_HOST}" -s ENABLE_HTTPS=true >/dev/null

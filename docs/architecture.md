@@ -36,7 +36,7 @@ Data layer (external to Kubernetes, private only):
 
 Storage:
 - EFS (RWX) for shared media/uploads mounted into LMS/CMS at `/openedx/media`
-- EBS gp3 (RWO) for single-writer PVCs (Meilisearch)
+- EBS CSI + `gp3` default StorageClass (baseline for dynamic PV provisioning)
 
 Observability:
 - kube-prometheus-stack (Prometheus, Grafana, Alertmanager)
@@ -45,7 +45,6 @@ Observability:
 Backups:
 - RDS snapshots (manual)
 - EC2 EBS snapshots (manual)
-- EBS-backed PV snapshots (manual)
 - EFS media: AWS Backup / EFS backup policy (documented)
 
 ## Kubernetes Layout (What Runs Where)
@@ -55,10 +54,10 @@ Backups:
 - Service: `ingress-nginx-controller` (type `LoadBalancer` -> NLB)
 
 `openedx-prod`:
-- Deployments: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp`, `meilisearch`
+- Deployments: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp`
 - Ingress: `openedx` (hosts `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`)
 - HPA: `lms-hpa`, `cms-hpa` (min=2, max=6, CPU target 70%)
-- PVC: `openedx-media` (RWX, EFS) and `meilisearch` (RWO, EBS gp3)
+- PVC: `openedx-media` (RWX, EFS)
 
 `observability`:
 - Helm releases: `kube-prometheus-stack`, `loki-stack`
@@ -142,7 +141,6 @@ flowchart LR
           LMSW["LMS Worker"]
           CMSW["CMS Worker"]
           SMTP["SMTP"]
-          MEILI["Meilisearch"]
           HPA["HPA lms cms"]
         end
 
@@ -163,7 +161,6 @@ flowchart LR
 
       subgraph STORAGE["Storage layer"]
         EFS[("EFS RWX openedx media")]
-        EBS[("EBS gp3 RWO meilisearch")]
       end
     end
   end
@@ -190,7 +187,6 @@ flowchart LR
 
   LMS --> EFS
   CMS --> EFS
-  MEILI --> EBS
 
   LMS -. metrics/logs .-> PROM
   CMS -. metrics/logs .-> PROM
@@ -221,7 +217,6 @@ flowchart TD
   A7 --> D3[("Redis 6379")]
   A7 --> D4[("Elasticsearch 9200")]
   A7 --> D5[("EFS media 2049")]
-  A7 --> D6[("Meilisearch PVC on EBS")]
 
   A7 -. metrics .-> O1["Prometheus"]
   A7 -. logs .-> O2["Loki"]

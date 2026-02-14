@@ -6,7 +6,9 @@ This document captures the **current deployment steps and fixes** for running Op
 
 - Cluster: `openedx-eks` (us-east-1)
 - Namespace: `openedx-prod`
-- Tutor: `v21.0.0` (installed in project venv)
+- Tutor: `v21.0.1` (installed in project venv)
+- Open edX image: `docker.io/overhangio/openedx:21.0.1-indigo`
+- MFE image: `docker.io/overhangio/openedx-mfe:21.0.0-indigo` (latest tag available in this environment)
 
 Config artifacts (checked into this repo):
 - Sanitized Tutor config: `data-layer/tutor/config/config.yml.sanitized`
@@ -17,7 +19,7 @@ Config artifacts (checked into this repo):
 ```bash
 python3 -m venv .venv
 .venv/bin/python3 -m pip install --upgrade pip
-.venv/bin/python3 -m pip install tutor
+.venv/bin/python3 -m pip install "tutor==21.0.1"
 .venv/bin/tutor plugins install mfe
 .venv/bin/tutor plugins install indigo
 ```
@@ -65,6 +67,9 @@ PY
   -s RUN_MYSQL=false \
   -s RUN_MONGODB=false \
   -s RUN_REDIS=false \
+  -s RUN_MEILISEARCH=false \
+  -s OPENEDX_IMAGE="docker.io/overhangio/openedx:21.0.1-indigo" \
+  -s MFE_DOCKER_IMAGE="docker.io/overhangio/openedx-mfe:21.0.0-indigo" \
   -s ELASTICSEARCH_HOST="http://${ES_IP}:9200" \
   -s MYSQL_HOST="$RDS_HOST" \
   -s MYSQL_PORT="$RDS_PORT" \
@@ -88,24 +93,16 @@ PY
 Notes:
 - Redis password is **URL-encoded** to keep Celery broker URLs valid.
 - Set `REDIS_USERNAME=default` so Tutor includes credentials in rendered `redis://` URLs (Redis ACL default user + `requirepass`).
-- Meilisearch key alignment is handled automatically by `infra/k8s/04-tutor-apply/apply.sh` (no secrets printed).
 
-## StorageClass Fix (Meilisearch PVC)
+## Storage Baseline (EBS CSI + Default StorageClass)
 
-Meilisearch requires a default StorageClass. Set `gp3` as default:
+This deployment sets `gp3` as the default StorageClass (EBS CSI), as a baseline for EKS dynamic PV provisioning.
 
 ```bash
 kubectl get storageclass
 kubectl get storageclass gp2 >/dev/null 2>&1 && \
   kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
 kubectl patch storageclass gp3 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
-```
-
-If the PVC was already created without a default class, delete and recreate it:
-
-```bash
-kubectl -n openedx-prod delete pvc meilisearch
-.venv/bin/tutor k8s start
 ```
 
 ## Shared Media Storage (Uploads/Media PVC)
@@ -165,12 +162,15 @@ curl -kIs -H 'Origin: https://apps.lms.openedx.local' \
 
 ## Enable Elasticsearch Backend (Search)
 
-Tutor v21 defaults to Meilisearch. To switch to Elasticsearch, enable a local plugin that injects settings patches.
+Tutor v21 includes an optional Meilisearch service by default. For strict compliance with
+"no databases in Kubernetes", this deployment disables Meilisearch (`RUN_MEILISEARCH=false`)
+and uses **external Elasticsearch on EC2** as the search backend.
 
 Plugin file (source of truth):
 - `data-layer/tutor/plugins/openedx-elasticsearch.py`
 
-Install/enable the local plugin and re-apply:
+Install/enable the local plugin and re-apply (note: `infra/k8s/04-tutor-apply/apply.sh`
+also copies/enables this plugin to avoid stale local plugin copies):
 
 ```bash
 mkdir -p "${HOME}/.local/share/tutor-plugins"
@@ -199,9 +199,9 @@ Captured output:
 
 ```text
 SEARCH_ENGINE= search.elastic.ElasticSearchEngine
-ELASTIC_SEARCH_CONFIG= [{'hosts': ['http://192.168.77.200:9200']}]
+ELASTIC_SEARCH_CONFIG= [{'hosts': ['http://192.168.95.171:9200']}]
 ELASTIC_SEARCH_INDEX_PREFIX= tutor_
-MEILISEARCH_ENABLED= True
+MEILISEARCH_ENABLED= False
 ```
 
 Simple index/query verification from inside LMS:
@@ -257,7 +257,6 @@ Liveness and readiness probes are injected by the post-render filter:
 Probes added:
 - LMS/CMS: HTTP `/heartbeat` on port 8000
 - MFE: HTTP `/` on port 8002
-- Meilisearch: HTTP `/health` on port 7700
 - SMTP: TCP 8025
 - Workers: `exec` check for celery process
 ## Verification
@@ -268,10 +267,8 @@ kubectl -n openedx-prod get ingress openedx
 kubectl -n openedx-prod get svc mfe -o wide
 ```
 
-Expected: `lms`, `cms`, `lms-worker`, `cms-worker`, `meilisearch`, `mfe`, `smtp` all Running and `mfe` service type is `ClusterIP`.
+Expected: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp` all Running and `mfe` service type is `ClusterIP`.
 
 ## Known Constraints
 
-- Tutor v21 uses **Meilisearch** for Studio/courseware content indexing jobs (the `reindex_*` init tasks expect it).
-- Elasticsearch integration is enabled via the `openedx-elasticsearch` Tutor plugin for Open edX search settings, while keeping Meilisearch enabled.
 - Use `infra/k8s/04-tutor-apply/apply.sh` so Caddy is removed via post-render filtering.

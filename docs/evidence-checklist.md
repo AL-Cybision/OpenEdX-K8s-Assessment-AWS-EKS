@@ -11,7 +11,7 @@ Use this exact order to match the rubric.
 ```bash
 kubectl -n openedx-prod get pods
 ```
-- Screenshot: output showing `lms`, `cms`, `lms-worker`, `cms-worker`, `meilisearch`, `mfe`, `smtp` **Running**
+- Screenshot: output showing `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp` **Running**
 - File: `docs/screenshots/openedx-pods.png`
 
 ### Command

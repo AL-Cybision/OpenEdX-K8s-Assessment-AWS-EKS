@@ -8,15 +8,20 @@ hooks.Filters.CONFIG_DEFAULTS.add_item(("ELASTICSEARCH_HOST", "http://elasticsea
 
 LMS_PATCH = """\
 # Enable Elasticsearch as the search backend
+MEILISEARCH_ENABLED = False
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
+ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
+
+# Keep MFE runtime config aligned (MFEs may read this from /api/mfe_config).
+MFE_CONFIG[\"MEILISEARCH_ENABLED\"] = \"false\"
 """
 
 CMS_PATCH = """\
 # Enable Elasticsearch as the search backend
+MEILISEARCH_ENABLED = False
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
+ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
 """
 

@@ -33,8 +33,7 @@ Sanitized Tutor config artifact (no secrets):
 Config export script (redacts secrets):
 - `data-layer/tutor/scripts/export-sanitized-config.py`
 
-Tutor patches and plugins:
-- `data-layer/tutor/patches/` (settings patches)
+Tutor plugins:
 - `data-layer/tutor/plugins/` (local plugins: Elasticsearch backend + HTTPS MFE CORS fix)
 
 Tutor deployment wrapper (always use this to avoid Caddy reappearing):
@@ -108,6 +107,8 @@ Deployment automation entrypoints:
 - `infra/terraform/apply.sh` (external data layer)
 - `infra/media-efs/apply.sh` (EFS media layer)
 - `infra/k8s/04-tutor-apply/apply.sh` (Tutor apply wrapper)
+- `infra/ses/setup.sh` (optional: SES identities + Secrets Manager SMTP creds)
+- `infra/ses/apply.sh` (optional: configure smtp relay to use SES)
 - `infra/cloudfront-waf/apply.sh` (CloudFront + WAF)
 - `infra/observability/install.sh` (monitoring stack)
 

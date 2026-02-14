@@ -11,6 +11,7 @@ REDACT_KEY_RE = re.compile(
     r"pass(word)?|secret|token|private|"
     r"aws_.*(secret|access)|"
     r"api[_-]?key|client[_-]?secret|"
+    r"(^|_)key($|_)|"
     r"encryption|signing"
     r")"
 )

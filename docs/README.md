@@ -1,5 +1,6 @@
 # Documentation Index
 
+- `AGENTS.md` — Agent/human operating guide (what/why/where/how/when)
 - `docs/external-data-layer.md` — External database layer provisioning and verification
 - `docs/tutor-k8s.md` — Tutor installation, external DB wiring, and EKS deployment (with NGINX ingress)
 - `docs/hpa-loadtest.md` — HPA manifests, k6 load test, and scaling evidence

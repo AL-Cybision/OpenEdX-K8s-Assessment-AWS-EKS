@@ -65,10 +65,10 @@ Shared media/uploads:
 - Rationale: LMS/CMS run with multiple replicas (HPA min=2); they must share uploads/media
 - Tradeoff: EFS requires NFS (2049) and EFS CSI; snapshotting differs from EBS (use AWS Backup / EFS backup policy)
 
-Single-writer PVCs:
-- Choice: EBS gp3 (RWO) for Meilisearch PVC
-- Rationale: simple, cost-effective for a single deployment replica
-- Tradeoff: cannot be mounted by multiple pods at once
+Default StorageClass:
+- Choice: `gp3` (EBS CSI) set as the default StorageClass
+- Rationale: baseline EKS storage configuration; keeps dynamic PV provisioning available if any in-cluster PVCs are enabled
+- Tradeoff: none (standard EKS practice)
 
 ## Edge and Traffic Management
 

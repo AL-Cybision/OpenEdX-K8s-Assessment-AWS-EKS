@@ -98,18 +98,13 @@ infra/media-efs/apply.sh
 ```
 
 Create storage resources in `openedx-prod`:
-- Ensures `gp3` is the default StorageClass (for Meilisearch PVC on EBS CSI)
+- Ensures `gp3` is the default StorageClass (EBS CSI baseline)
 - Creates the EFS-backed `openedx-media` PV/PVC
 
 ```bash
 infra/k8s/02-storage/apply.sh
 kubectl get storageclass
 kubectl -n openedx-prod get pvc openedx-media
-```
-
-If Meilisearch PVC is stuck from an earlier failed init:
-```bash
-kubectl -n openedx-prod delete pvc meilisearch --ignore-not-found
 ```
 
 ## 5) Tutor/Open edX Apply (Caddy Removed + Probes + Media Mount)
@@ -277,6 +272,53 @@ infra/backups/backup.sh
 ```
 
 EFS media backup strategy: `docs/backup-restore.md`.
+
+## 9.1) Email Activation (Professional SMTP via Amazon SES)
+
+If you want learner registration + activation to work end-to-end (activation emails delivered), configure SMTP properly.
+
+This repo ships an SES-based setup that keeps the architecture unchanged:
+- Open edX still sends mail to the in-cluster `smtp` service (`smtp:8025`)
+- The `smtp` pod (Exim relay) is configured to relay **outbound** via **Amazon SES SMTP (587 + auth)**.
+
+Check SES sandbox status:
+```bash
+aws sesv2 get-account --region us-east-1 --query '{ProductionAccessEnabled:ProductionAccessEnabled,SendingEnabled:SendingEnabled,SendQuota:SendQuota}' --output json
+```
+
+If `ProductionAccessEnabled=false` (sandbox), SES can only send to verified identities.
+For testing activation, you can verify your own recipient email address.
+
+Important: the SES identity you verify must match the **From** address that Open edX uses.
+By default, Open edX uses `contact@<LMS_HOST>` as `DEFAULT_FROM_EMAIL` (example: `contact@lms.syncummah.com`).
+
+1. Create/ensure SES identities and store SMTP creds in Secrets Manager (no secrets printed).
+Recommended (matches the default Open edX from-address pattern):
+```bash
+REGION=us-east-1 SES_DOMAIN=lms.syncummah.com FROM_EMAIL=contact@lms.syncummah.com VERIFY_RECIPIENT_EMAIL=you@example.com \
+  infra/ses/setup.sh
+```
+
+This prints the DNS records to add (SES verification TXT + DKIM CNAMEs). Add them in your DNS, then wait until SES shows the identity as verified.
+
+2. Apply SMTP relay config to Kubernetes (use the Secret ARN printed by `setup.sh`):
+```bash
+REGION=us-east-1 SES_SMTP_SECRET_ID='arn:aws:secretsmanager:us-east-1:...:secret:openedx-prod/ses-smtp-...' infra/ses/apply.sh
+kubectl -n openedx-prod logs deploy/smtp --tail=50
+```
+
+3. Trigger activation email from the LMS UI by registering a learner account.
+
+Debug tip (verifies relay wiring without exposing secrets):
+```bash
+kubectl -n openedx-prod exec deploy/lms -c lms -- sh -lc '\
+  cd /openedx/edx-platform && \
+  /openedx/venv/bin/python manage.py lms shell -c "from django.core.mail import send_mail; send_mail(\"Open edX SES test\",\"hello\",None,[\"you@example.com\"],fail_silently=False); print(\"sent\")"'
+
+kubectl -n openedx-prod logs deploy/smtp --tail=200
+```
+
+Production note: to send to arbitrary recipients, request SES production access for your AWS account/region.
 
 ## 10) Evidence Pack
 

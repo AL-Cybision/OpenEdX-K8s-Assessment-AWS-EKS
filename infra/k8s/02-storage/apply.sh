@@ -10,8 +10,8 @@ MEDIA_EFS_DIR="${SCRIPT_DIR}/../../media-efs"
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 
-# Meilisearch uses an EBS-backed PVC from the default StorageClass.
-# Ensure gp3 exists and is default before Tutor initializes workloads.
+# Baseline EKS storage: ensure `gp3` exists and is the default StorageClass.
+# (EBS CSI dynamic provisioning; some workloads may rely on a default class.)
 kubectl apply -f "${REPO_ROOT}/k8s/02-storage/storageclass-gp3.yaml"
 kubectl patch storageclass gp3 \
   -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
