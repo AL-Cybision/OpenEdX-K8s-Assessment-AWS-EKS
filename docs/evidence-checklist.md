@@ -13,6 +13,7 @@ kubectl -n openedx-prod get pods
 ```
 - Screenshot: output showing `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp` **Running**
 - File: `docs/screenshots/openedx-pods.png`
+  - Pending: **re-take** this screenshot after the Meilisearch removal change (it must not show any `meilisearch` pod).
 
 ### Command
 ```bash
