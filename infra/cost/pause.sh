@@ -27,22 +27,49 @@ log "region=${AWS_REGION} cluster=${CLUSTER_NAME}"
 aws sts get-caller-identity --output json >/dev/null
 
 log "Stopping EC2 data-layer instances (tag:Name starts with ${EC2_NAME_PREFIX}-...)"
-EC2_IDS=$(
+EC2_FILTERS=(
+  "Name=tag:Name,Values=${EC2_NAME_PREFIX}-mongo,${EC2_NAME_PREFIX}-redis,${EC2_NAME_PREFIX}-elasticsearch"
+)
+
+# Stop only instances that are currently running. Calling stop on "stopped"
+# instances fails, so keep this idempotent.
+EC2_IDS_TO_STOP=$(
   aws ec2 describe-instances --region "$AWS_REGION" \
-    --filters "Name=tag:Name,Values=${EC2_NAME_PREFIX}-mongo,${EC2_NAME_PREFIX}-redis,${EC2_NAME_PREFIX}-elasticsearch" \
-              "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+    --filters "${EC2_FILTERS[@]}" "Name=instance-state-name,Values=running" \
     --query 'Reservations[].Instances[].InstanceId' --output text
 )
 
-if [[ -n "${EC2_IDS// /}" ]]; then
-  aws ec2 stop-instances --region "$AWS_REGION" --instance-ids $EC2_IDS >/dev/null
-  log "EC2 stop requested: $EC2_IDS"
+# Instances to wait on (includes "stopping"; safe because stopped instances
+# return immediately). We intentionally exclude "pending" to avoid hanging if a
+# start is in progress.
+EC2_IDS_ALL=$(
+  aws ec2 describe-instances --region "$AWS_REGION" \
+    --filters "${EC2_FILTERS[@]}" "Name=instance-state-name,Values=running,stopping,stopped" \
+    --query 'Reservations[].Instances[].InstanceId' --output text
+)
+
+EC2_IDS_PENDING=$(
+  aws ec2 describe-instances --region "$AWS_REGION" \
+    --filters "${EC2_FILTERS[@]}" "Name=instance-state-name,Values=pending" \
+    --query 'Reservations[].Instances[].InstanceId' --output text
+)
+
+if [[ -n "${EC2_IDS_PENDING// /}" ]]; then
+  log "WARNING: Some EC2 instances are in 'pending' state (start in progress): ${EC2_IDS_PENDING}"
+  log "         Re-run pause later if you need them stopped."
+fi
+
+if [[ -n "${EC2_IDS_TO_STOP// /}" ]]; then
+  aws ec2 stop-instances --region "$AWS_REGION" --instance-ids $EC2_IDS_TO_STOP >/dev/null
+  log "EC2 stop requested: $EC2_IDS_TO_STOP"
   if [[ "$WAIT" == "true" ]]; then
-    aws ec2 wait instance-stopped --region "$AWS_REGION" --instance-ids $EC2_IDS
-    log "EC2 instances are stopped"
+    if [[ -n "${EC2_IDS_ALL// /}" ]]; then
+      aws ec2 wait instance-stopped --region "$AWS_REGION" --instance-ids $EC2_IDS_ALL
+      log "EC2 instances are stopped"
+    fi
   fi
 else
-  log "No EC2 instances found to stop (already terminated or tag mismatch)"
+  log "No running EC2 instances found to stop (already stopped/terminated)"
 fi
 
 if [[ "$STOP_RDS" == "true" ]]; then
@@ -53,8 +80,16 @@ if [[ "$STOP_RDS" == "true" ]]; then
       aws rds stop-db-instance --region "$AWS_REGION" --db-instance-identifier "$RDS_INSTANCE_ID" >/dev/null
       log "RDS stop requested"
       if [[ "$WAIT" == "true" ]]; then
-        aws rds wait db-instance-stopped --region "$AWS_REGION" --db-instance-identifier "$RDS_INSTANCE_ID"
-        log "RDS instance is stopped"
+        # aws-cli v2 does not provide a "db-instance-stopped" waiter. Poll until
+        # the instance reports "stopped" or until timeout.
+        log "Waiting for RDS to stop (polling describe-db-instances)"
+        for _ in $(seq 1 90); do
+          st=$(aws rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$RDS_INSTANCE_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+          [[ "$st" == "stopped" ]] && break
+          sleep 20
+        done
+        st=$(aws rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$RDS_INSTANCE_ID" --query 'DBInstances[0].DBInstanceStatus' --output text)
+        log "RDS status=${st}"
       fi
     else
       log "RDS status is '${RDS_STATUS}', skipping stop"
@@ -92,4 +127,3 @@ if [[ "$WAIT" == "true" ]]; then
 fi
 
 log "Done. Baseline costs still apply (EKS control plane, NAT Gateway, Load Balancer, EFS/RDS storage)."
-

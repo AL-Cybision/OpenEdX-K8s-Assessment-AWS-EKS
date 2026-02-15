@@ -53,22 +53,38 @@ else
 fi
 
 log "Starting EC2 data-layer instances (tag:Name starts with ${EC2_NAME_PREFIX}-...)"
-EC2_IDS=$(
+EC2_FILTERS=(
+  "Name=tag:Name,Values=${EC2_NAME_PREFIX}-mongo,${EC2_NAME_PREFIX}-redis,${EC2_NAME_PREFIX}-elasticsearch"
+)
+
+# Start only stopped instances. Calling start on "running" instances fails, so
+# keep this idempotent.
+EC2_IDS_TO_START=$(
   aws ec2 describe-instances --region "$AWS_REGION" \
-    --filters "Name=tag:Name,Values=${EC2_NAME_PREFIX}-mongo,${EC2_NAME_PREFIX}-redis,${EC2_NAME_PREFIX}-elasticsearch" \
-              "Name=instance-state-name,Values=pending,running,stopping,stopped" \
+    --filters "${EC2_FILTERS[@]}" "Name=instance-state-name,Values=stopped" \
     --query 'Reservations[].Instances[].InstanceId' --output text
 )
 
-if [[ -n "${EC2_IDS// /}" ]]; then
-  aws ec2 start-instances --region "$AWS_REGION" --instance-ids $EC2_IDS >/dev/null
-  log "EC2 start requested: $EC2_IDS"
+EC2_IDS_STOPPING=$(
+  aws ec2 describe-instances --region "$AWS_REGION" \
+    --filters "${EC2_FILTERS[@]}" "Name=instance-state-name,Values=stopping" \
+    --query 'Reservations[].Instances[].InstanceId' --output text
+)
+
+if [[ -n "${EC2_IDS_STOPPING// /}" ]]; then
+  log "WARNING: Some EC2 instances are in 'stopping' state: ${EC2_IDS_STOPPING}"
+  log "         Wait for them to stop, then re-run resume if needed."
+fi
+
+if [[ -n "${EC2_IDS_TO_START// /}" ]]; then
+  aws ec2 start-instances --region "$AWS_REGION" --instance-ids $EC2_IDS_TO_START >/dev/null
+  log "EC2 start requested: $EC2_IDS_TO_START"
   if [[ "$WAIT" == "true" ]]; then
-    aws ec2 wait instance-running --region "$AWS_REGION" --instance-ids $EC2_IDS
+    aws ec2 wait instance-running --region "$AWS_REGION" --instance-ids $EC2_IDS_TO_START
     log "EC2 instances are running"
   fi
 else
-  log "No EC2 instances found to start (terminated or tag mismatch)"
+  log "No stopped EC2 instances found to start (already running/terminated)"
 fi
 
 log "Scaling EKS managed nodegroups (min=${NODEGROUP_MIN}, desired=${NODEGROUP_DESIRED}, max=${NODEGROUP_MAX})"
@@ -109,4 +125,3 @@ fi
 log "Done. Next: wait for workloads to become Ready:"
 log "  kubectl -n ingress-nginx get pods"
 log "  kubectl -n openedx-prod get pods"
-
