@@ -197,3 +197,31 @@ Verify:
 ```bash
 infra/cloudfront-waf/verify.sh
 ```
+
+## 11) Login Fails (Red Banner) / 500 on login_session
+
+Symptom:
+- LMS login page shows: "We couldn't sign you in. An error has occurred..."
+- LMS logs show `Internal Server Error: /api/user/v1/account/login_session/`
+- Traceback includes: `User.profile.RelatedObjectDoesNotExist: User has no profile.`
+
+Cause:
+- The user exists, but is missing the Open edX `UserProfile` row. This can happen if the account was created with `createsuperuser` instead of Open edX's `manage_user`.
+
+Fix:
+- Create the user profile for the affected account (example uses `admin` username):
+```bash
+kubectl -n openedx-prod exec deploy/lms -c lms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py lms shell -c "
+from django.contrib.auth import get_user_model
+from common.djangoapps.student.models import UserProfile
+u=get_user_model().objects.get(username=\"admin\")
+up, created = UserProfile.objects.get_or_create(user=u, defaults={\"name\": u.username})
+print({\"user\":u.username, \"profile_created\": created})
+"
+'
+```
+
+Prevention:
+- Create accounts with `manage_user` (see `docs/reproduce.md` -> "Create Initial Accounts").

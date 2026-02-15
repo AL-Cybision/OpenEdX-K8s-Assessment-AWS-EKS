@@ -146,12 +146,54 @@ LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
 printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.openedx.local\n" "$LB_IP" | sudo tee -a /etc/hosts >/dev/null
 ```
 
-## 5.1) Studio Course Creation + Persistence Validation (Mandatory)
+## 5.1) Create Initial Accounts (Admin + Course Staff)
+
+Create the first platform admin (Django superuser) and at least one staff user for Studio access.
+
+Notes:
+- Prefer `manage_user` over `createsuperuser` here. We observed `createsuperuser` can leave the account without a `UserProfile`, which breaks `/api/user/v1/account/login_session/` with a 500.
+- Do **not** commit passwords to git; set them interactively with `changepassword`.
+
+Create admin (superuser + staff), then set password:
+```bash
+kubectl -n openedx-prod exec -it deploy/lms -c lms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py lms manage_user --superuser --staff admin admin@example.com &&
+  /openedx/venv/bin/python manage.py lms changepassword admin
+'
+```
+
+Ensure `UserProfile` exists for the admin (required for login session creation):
+```bash
+kubectl -n openedx-prod exec deploy/lms -c lms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py lms shell -c "
+from django.contrib.auth import get_user_model
+from common.djangoapps.student.models import UserProfile
+u=get_user_model().objects.get(username=\"admin\")
+up, created = UserProfile.objects.get_or_create(user=u, defaults={\"name\": u.username})
+print({\"user\":u.username, \"profile_created\": created})
+"
+'
+```
+
+Create a staff user for course authoring, then set password:
+```bash
+kubectl -n openedx-prod exec -it deploy/lms -c lms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py lms manage_user --staff courseauthor courseauthor@example.com &&
+  /openedx/venv/bin/python manage.py lms changepassword courseauthor
+'
+```
+
+## 5.2) Studio Course Creation + Persistence Validation (Mandatory)
 
 Create one sample course in Studio:
 - Open `https://studio.openedx.local`
+- Sign in as the admin user created above
 - Create a new course (for example `compliance-101`)
 - Publish at least one unit/page
+- Optional: in Studio -> `Settings` -> `Course Team`, add `courseauthor@example.com` as course staff/instructor and confirm they can access the course.
 
 Verify MongoDB contains course/modulestore collections (without printing secrets):
 ```bash
