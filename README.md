@@ -11,6 +11,7 @@ Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Mei
 - External references (upstream docs): `docs/references.md`
 - Research summary (upstream best practices): `docs/upstream-guidance.md`
 - Reproduction runbook: `docs/reproduce.md`
+- Operator smoke test (post-deploy verification): `docs/smoke-test.md`
 - Optional: cluster automation: `infra/eksctl/`
 - Configuration artifacts index: `docs/config-artifacts.md`
 
@@ -42,13 +43,14 @@ High-level execution order:
 2. Core add-ons (EBS CSI + `gp3` default + metrics-server): `infra/eksctl/install-core-addons.sh`
 3. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
 4. NGINX ingress controller: `infra/ingress-nginx/install.sh`
-5. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
-6. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
-7. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
-8. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
-9. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
-10. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
-11. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
+5. (Optional) cert-manager (real domains + Let's Encrypt TLS): `infra/cert-manager/install.sh`
+6. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
+7. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
+8. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
+9. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+10. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
+11. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
+12. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
 
 ## Evidence Pack
 

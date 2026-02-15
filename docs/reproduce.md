@@ -146,6 +146,28 @@ LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
 printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.openedx.local\n" "$LB_IP" | sudo tee -a /etc/hosts >/dev/null
 ```
 
+Optional: Use a real domain + Let’s Encrypt TLS (recommended for production-like browser testing).
+
+This avoids `/etc/hosts` hacks and self-signed TLS warnings.
+
+Prereqs:
+- DNS records `lms.<domain>`, `studio.<domain>`, and `apps.lms.<domain>` point to the ingress-nginx LoadBalancer DNS name.
+- cert-manager installed:
+```bash
+infra/cert-manager/install.sh
+```
+
+Apply ClusterIssuer + Certificate + Ingress (creates a separate Ingress; does not replace the placeholder ingress):
+```bash
+LETSENCRYPT_EMAIL="you@example.com" \
+LMS_HOST="lms.example.com" \
+CMS_HOST="studio.example.com" \
+MFE_HOST="apps.lms.example.com" \
+TLS_SECRET_NAME="openedx-tls-example" \
+INGRESS_NAME="openedx-example" \
+  k8s/03-ingress/real-domain/apply.sh
+```
+
 ## 5.1) Create Initial Accounts (Admin + Course Staff)
 
 Create the first platform admin (Django superuser) and at least one staff user for Studio access.
@@ -194,6 +216,21 @@ Create one sample course in Studio:
 - Create a new course (for example `compliance-101`)
 - Publish at least one unit/page
 - Optional: in Studio -> `Settings` -> `Course Team`, add `courseauthor@example.com` as course staff/instructor and confirm they can access the course.
+
+Terminal-only alternative (if you want a headless proof without using the browser):
+```bash
+# Create a course (split modulestore is the default for Tutor/Open edX).
+kubectl -n openedx-prod exec deploy/cms -c cms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py cms create_course split admin@example.com SYNC SMOKE101 2026_T1 "Smoke Test Course" 2026-02-15
+'
+
+# Enroll a learner in the course (idempotent).
+kubectl -n openedx-prod exec deploy/lms -c lms -- sh -lc '
+  cd /openedx/edx-platform &&
+  /openedx/venv/bin/python manage.py lms enroll_user_in_course -e learner1@example.com -c course-v1:SYNC+SMOKE101+2026_T1
+'
+```
 
 Verify MongoDB contains course/modulestore collections (without printing secrets):
 ```bash

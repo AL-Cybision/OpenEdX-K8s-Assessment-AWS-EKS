@@ -11,6 +11,7 @@ Namespaces:
 
 Ingress resources:
 - `k8s/03-ingress/openedx-ingress.yaml` (hosts, TLS, routing, rate-limits)
+- `k8s/03-ingress/real-domain/apply.sh` (optional: real domain + Let’s Encrypt TLS via cert-manager)
 - `k8s/01-echo-ingress.yaml` (sanity test ingress used early)
 
 Storage:
@@ -64,6 +65,9 @@ Observability (Prometheus/Grafana + Loki):
 - `infra/observability/values-kube-prometheus-stack.yaml`
 - `infra/observability/values-loki-stack.yaml`
 
+cert-manager (optional: production-style TLS for real domains):
+- `infra/cert-manager/install.sh`
+
 ## 5) Database Connection + Initialization Scripts
 
 DB provisioning (Terraform):
@@ -104,6 +108,7 @@ Evidence checklist (screenshots + terminal proof):
 Deployment automation entrypoints:
 - `docs/reproduce.md` (end-to-end runbook)
 - `infra/eksctl/install-core-addons.sh` (EBS CSI + gp3 default + metrics-server)
+- `infra/cert-manager/install.sh` (optional: cert-manager install for Let’s Encrypt TLS)
 - `infra/terraform/apply.sh` (external data layer)
 - `infra/media-efs/apply.sh` (EFS media layer)
 - `infra/k8s/04-tutor-apply/apply.sh` (Tutor apply wrapper)
