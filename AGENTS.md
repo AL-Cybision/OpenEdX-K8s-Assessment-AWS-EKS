@@ -126,10 +126,11 @@ Notes:
   - Scale nodegroup to `desired=3` temporarily.
 - HPA shows `cpu: <unknown>`: metrics-server missing/unhealthy.
   - Fix via `infra/eksctl/install-core-addons.sh`, then `kubectl top nodes`.
-- PVC Pending / dynamic provisioning broken: EBS CSI or default `gp3` StorageClass missing.
-  - Ensure EBS CSI add-on + `gp3` default, then retry the workload/PVC.
+- Meilisearch PVC stuck: EBS CSI or default `gp3` StorageClass missing.
+  - Ensure EBS CSI add-on + `gp3` default, then recreate PVC.
 - MFE white screen / auth redirect loops with `.local` domains:
   - Use consistent HTTPS hostnames and the HTTPS MFE plugin documented in `docs/reproduce.md`.
   - Real DNS + trusted certs (Route53/ACM or cert-manager) is the production fix; `.local` is assessment-mode.
 - SES mail rejected:
   - Verify SES identities (domain + DKIM) and sandbox/production access status.
+
