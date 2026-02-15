@@ -34,6 +34,7 @@ Infrastructure:
 - `infra/eksctl/`: create/delete cluster and core add-ons automation
 - `infra/terraform/`: external data layer (RDS + EC2 Mongo/Redis/Elasticsearch) via Terraform
 - `infra/ingress-nginx/`: NGINX ingress controller install (Helm) + values
+- `infra/cert-manager/`: cert-manager install script (production-mode TLS via Let’s Encrypt)
 - `infra/observability/`: kube-prometheus-stack + loki-stack install + alerts
 - `infra/cloudfront-waf/`: CloudFront + WAF Terraform + apply/verify scripts
 - `infra/k8s/`: Kubernetes automation (storage, tutor apply wrapper, HPA, etc)

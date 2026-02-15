@@ -66,7 +66,7 @@ Observability (Prometheus/Grafana + Loki):
 - `infra/observability/values-kube-prometheus-stack.yaml`
 - `infra/observability/values-loki-stack.yaml`
 
-cert-manager (optional: production-style TLS for real domains):
+cert-manager (production-mode TLS for real domains via Let’s Encrypt):
 - `infra/cert-manager/install.sh`
 
 ## 5) Database Connection + Initialization Scripts
@@ -109,7 +109,7 @@ Evidence checklist (screenshots + terminal proof):
 Deployment automation entrypoints:
 - `docs/reproduce.md` (end-to-end runbook)
 - `infra/eksctl/install-core-addons.sh` (EBS CSI + gp3 default + metrics-server)
-- `infra/cert-manager/install.sh` (optional: cert-manager install for Let’s Encrypt TLS)
+- `infra/cert-manager/install.sh` (production-mode TLS: cert-manager + Let’s Encrypt)
 - `infra/terraform/apply.sh` (external data layer)
 - `infra/media-efs/apply.sh` (EFS media layer)
 - `infra/k8s/04-tutor-apply/apply.sh` (Tutor apply wrapper)
