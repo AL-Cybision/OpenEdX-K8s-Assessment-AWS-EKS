@@ -99,12 +99,11 @@ Runbook section: `docs/reproduce.md` -> "Email Activation (Professional SMTP via
 ## When (Cost Control)
 
 Overnight pause (keeps resources, reduces most variable cost):
-- Scale EKS nodegroup to `desired=0`
-- Stop EC2 data-layer instances (mongo/redis/elasticsearch)
+- Run `infra/cost/pause.sh` (scales EKS nodegroups to `desired=0` + stops EC2 data-layer, optionally stops RDS)
 
 Resume:
-- Scale nodegroup back to `desired>=2` (use `3` if pods are Pending due to CPU/memory)
-- Start EC2 data-layer instances
+- Run `infra/cost/resume.sh` (starts EC2 data-layer + scales EKS nodegroups back to defaults)
+- If pods are Pending due to CPU/memory, temporarily resume with `NODEGROUP_DESIRED=3` (or larger instance types)
 
 Notes:
 - EKS control plane still bills even with 0 nodes.
@@ -133,4 +132,3 @@ Notes:
   - Real DNS + trusted certs (Route53/ACM or cert-manager) is the production fix; `.local` is assessment-mode.
 - SES mail rejected:
   - Verify SES identities (domain + DKIM) and sandbox/production access status.
-
