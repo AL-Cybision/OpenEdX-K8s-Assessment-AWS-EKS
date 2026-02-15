@@ -12,9 +12,9 @@ Rerun behavior:
 
 Origin protocol note:
 - This repo uses `origin_protocol_policy = "http-only"` (CloudFront -> origin over HTTP).
-- Reason: the NGINX Ingress uses a **self-signed** certificate for placeholder domains (`*.openedx.local`), and CloudFront requires a publicly trusted certificate for HTTPS-to-origin.
-- TLS termination at NGINX is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local`.
-- Production hardening: use real DNS + a trusted certificate (ACM or otherwise) and switch CloudFront to HTTPS-to-origin.
+- Reason: HTTPS-to-origin requires a publicly trusted certificate that matches the **origin hostname** CloudFront connects to. By default, this repo uses the ingress LoadBalancer DNS name as the origin, which is not covered by the app TLS certificate.
+- TLS termination at NGINX is demonstrated via direct ingress access to `https://<LMS_HOST>` / `https://<CMS_HOST>` (production-mode: Let’s Encrypt via cert-manager; assessment-mode: self-signed).
+- Production hardening: set the CloudFront origin domain name to a real DNS name covered by your certificate (for example `lms.<domain>` pointing to the ingress LoadBalancer), then switch CloudFront to HTTPS-to-origin.
 
 `infra/cloudfront-waf/apply.sh` supports protocol selection:
 ```bash
@@ -48,4 +48,4 @@ Expected 403 (WAF block):
 HTTP/2 403
 ```
 
-Note: 404 for the default CloudFront domain is expected because it doesn't match the NGINX Ingress host rules (`lms.openedx.local`, `studio.openedx.local`). In production, attach a real domain to CloudFront + Tutor/Ingress.
+Note: 404 for the default CloudFront domain is expected because it doesn't match the NGINX Ingress host rules (`LMS_HOST`, `CMS_HOST`). In production, attach a real domain to CloudFront + Ingress (alternate domain names) and align host routing.

@@ -83,9 +83,11 @@ Remove Caddy permanently:
 - Tradeoff: wrapper must be used consistently for apply operations
 
 TLS termination:
-- Choice: terminate TLS at NGINX ingress (self-signed for placeholder domains)
-- Rationale: meets the requirement; keeps certificates at the edge
-- Tradeoff: for real production, use real DNS + ACM and trust chain
+- Choice: terminate TLS at NGINX ingress
+- Production-mode: cert-manager + Let’s Encrypt for trusted TLS on real domains
+- Assessment-mode fallback: self-signed TLS on placeholder `.local` hostnames
+- Rationale: meets the requirement and matches real production patterns (trusted certs at the edge)
+- Tradeoff: real domains require DNS + ACME validation (more setup than placeholder `.local`)
 
 ## Scalability + Operations
 

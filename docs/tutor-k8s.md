@@ -28,6 +28,12 @@ python3 -m venv .venv
 
 Use AWS Secrets Manager for the DB credentials. **Do not print secrets.**
 
+Production-mode note:
+- Set `LMS_HOST` / `CMS_HOST` to **real DNS hostnames** (recommended), then use
+  cert-manager + Let’s Encrypt for trusted TLS at the NGINX Ingress.
+- The MFE hostname is `apps.<LMS_HOST>` (example: if `LMS_HOST=lms.example.com`, then
+  the MFE host is `apps.lms.example.com`). Ensure DNS + Ingress routing exist for it.
+
 ```bash
 RDS_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw rds_secret_arn)
 MONGO_SECRET_ARN=$(terraform -chdir=infra/terraform output -raw mongo_secret_arn)
@@ -59,11 +65,16 @@ print(urllib.parse.quote(os.environ['REDIS_PASS_RAW'], safe=''))
 PY
 )
 
+# Choose your real domains (production-mode).
+LMS_HOST="lms.example.com"
+CMS_HOST="studio.example.com"
+
 .venv/bin/tutor config save \
-  -s LMS_HOST=lms.openedx.local \
-  -s CMS_HOST=studio.openedx.local \
+  -s LMS_HOST="${LMS_HOST}" \
+  -s CMS_HOST="${CMS_HOST}" \
   -s K8S_NAMESPACE=openedx-prod \
   -s ENABLE_WEB_PROXY=false \
+  -s ENABLE_HTTPS=true \
   -s RUN_MYSQL=false \
   -s RUN_MONGODB=false \
   -s RUN_REDIS=false \
@@ -156,8 +167,11 @@ infra/k8s/04-tutor-apply/apply.sh
 Verification:
 
 ```bash
-curl -kIs -H 'Origin: https://apps.lms.openedx.local' \
-  https://lms.openedx.local/api/user/v1/account/registration/ | rg -i 'access-control-allow-origin'
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+
+curl -kIs -H "Origin: https://apps.${LMS_HOST}" \
+  "https://${LMS_HOST}/api/user/v1/account/registration/" | rg -i 'access-control-allow-origin'
 ```
 
 ## Enable Elasticsearch Backend (Search)

@@ -14,16 +14,15 @@ kubectl -n openedx-prod get hpa
 
 ## 2) HTTP Health Checks
 
-Placeholder ingress (requires `/etc/hosts` mapping as per `docs/reproduce.md`):
 ```bash
-curl -kIs https://lms.openedx.local/heartbeat | head
-curl -kIs https://studio.openedx.local/heartbeat | head
-```
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
 
-Real domain ingress (if configured):
-```bash
-curl -Is https://lms.example.com/heartbeat | head
-curl -Is https://studio.example.com/heartbeat | head
+# Assessment-mode: self-signed TLS -> keep -k
+# Production-mode: trusted TLS (Let's Encrypt) -> you can remove -k
+curl -kIs "https://${LMS_HOST}/heartbeat" | head
+curl -kIs "https://${CMS_HOST}/heartbeat" | head
 ```
 
 ## 3) Create Accounts (Admin + Staff)
@@ -117,4 +116,3 @@ infra/cloudfront-waf/verify.sh
 ```bash
 kubectl -n observability get pods
 ```
-

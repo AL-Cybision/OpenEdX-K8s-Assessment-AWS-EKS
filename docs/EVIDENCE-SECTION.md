@@ -66,7 +66,7 @@ openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:330
 ```
 
 ## 3b) Studio Course Creation + Mongo Persistence + Pod Restart
-Create a course in Studio (`https://studio.openedx.local`), then verify Mongo collections and post-restart persistence.
+Create a course in Studio (at `https://<CMS_HOST>`), then verify Mongo collections and post-restart persistence.
 
 Mongo verification command (no secrets printed):
 ```bash
@@ -106,13 +106,16 @@ kubectl top nodes
 
 Generate load (k6):
 ```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+
 kubectl -n openedx-prod create configmap k6-script \
   --from-file=loadtest-k6.js=infra/k8s/05-hpa/loadtest-k6.js \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n openedx-prod delete job k6-loadtest --ignore-not-found
 
-cat <<'YAML' | kubectl apply -f -
+cat <<YAML | kubectl apply -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -128,6 +131,9 @@ spec:
         - name: k6
           image: grafana/k6:0.49.0
           args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
+          env:
+            - name: LMS_HOST
+              value: "${LMS_HOST}"
           volumeMounts:
             - name: scripts
               mountPath: /scripts

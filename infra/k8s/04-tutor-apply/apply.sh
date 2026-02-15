@@ -7,11 +7,23 @@ set -euo pipefail
 TUTOR_BIN="${TUTOR_BIN:-.venv/bin/tutor}"
 NAMESPACE="${NAMESPACE:-openedx-prod}"
 TUTOR_ENV_DIR="${TUTOR_ENV_DIR:-${HOME}/.local/share/tutor/env}"
-LMS_HOST="${LMS_HOST:-lms.openedx.local}"
-CMS_HOST="${CMS_HOST:-studio.openedx.local}"
+LMS_HOST="${LMS_HOST:-}"
+CMS_HOST="${CMS_HOST:-}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 TUTOR_PLUGINS_DIR="${TUTOR_PLUGINS_DIR:-${HOME}/.local/share/tutor-plugins}"
+
+# Prefer the hostnames already set in Tutor config. Falling back to placeholders
+# is fine for assessment-mode, but we must not accidentally override a real-domain
+# production-mode configuration.
+if [[ -z "${LMS_HOST}" ]]; then
+  LMS_HOST="$("${TUTOR_BIN}" config printvalue LMS_HOST 2>/dev/null || true)"
+fi
+if [[ -z "${CMS_HOST}" ]]; then
+  CMS_HOST="$("${TUTOR_BIN}" config printvalue CMS_HOST 2>/dev/null || true)"
+fi
+LMS_HOST="${LMS_HOST:-lms.openedx.local}"
+CMS_HOST="${CMS_HOST:-studio.openedx.local}"
 
 # Ensure post-render scripts (python) see these values even when defaults are used.
 export LMS_HOST CMS_HOST

@@ -19,7 +19,7 @@ kubectl -n openedx-prod get pods
 ```bash
 kubectl -n openedx-prod get ingress openedx
 ```
-- Screenshot: output showing hosts `lms.openedx.local` and `studio.openedx.local`
+- Screenshot: output showing your configured hosts (`LMS_HOST`, `CMS_HOST`, and `apps.<LMS_HOST>`)
 - File: `docs/screenshots/openedx-ingress.png`
 
 ### Command
@@ -61,7 +61,7 @@ kubectl -n openedx-prod delete pod verify-net --ignore-not-found
 
 ## 3.1) Studio Course + Mongo Persistence + Pod Restart (Terminal + UI)
 ### Create Course in Studio
-- Open `https://studio.openedx.local`
+- Open `https://<CMS_HOST>` (example: `https://studio.example.com`)
 - Create a new course (for example `compliance-101`) and publish at least one unit/page
 - Screenshot: course exists in Studio
 - File: `docs/screenshots/studio-course-created.png`
@@ -104,13 +104,16 @@ kubectl top nodes
 
 Run load (in-cluster) in one terminal:
 ```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+
 kubectl -n openedx-prod create configmap k6-script \
   --from-file=loadtest-k6.js=infra/k8s/05-hpa/loadtest-k6.js \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n openedx-prod delete job k6-loadtest --ignore-not-found
 
-cat <<'YAML' | kubectl apply -f -
+cat <<YAML | kubectl apply -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -126,6 +129,9 @@ spec:
         - name: k6
           image: grafana/k6:0.49.0
           args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
+          env:
+            - name: LMS_HOST
+              value: "${LMS_HOST}"
           volumeMounts:
             - name: scripts
               mountPath: /scripts

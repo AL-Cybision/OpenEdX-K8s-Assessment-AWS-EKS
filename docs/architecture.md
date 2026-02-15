@@ -10,7 +10,8 @@ This document explains what is deployed, where it runs (AWS/Kubernetes), and how
 - `openedx-prod` (Open edX workloads)
 - `ingress-nginx` (NGINX Ingress Controller)
 - `observability` (Prometheus/Grafana + Loki)
-- Domains (placeholders for assessment): `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
+- Domains (production-mode): `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>` (cert-manager + Let’s Encrypt)
+- Assessment-mode fallback: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local` (self-signed + `/etc/hosts`)
 - Databases are external to Kubernetes (RDS + EC2), private only.
 
 ## Components (By Layer)
@@ -55,7 +56,7 @@ Backups:
 
 `openedx-prod`:
 - Deployments: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp`
-- Ingress: `openedx` (hosts `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`)
+- Ingress: `openedx` (hosts `LMS_HOST`, `CMS_HOST`, `apps.<LMS_HOST>`)
 - HPA: `lms-hpa`, `cms-hpa` (min=2, max=6, CPU target 70%)
 - PVC: `openedx-media` (RWX, EFS)
 
@@ -232,8 +233,8 @@ flowchart TD
 
 ## Notes (Assessment vs Real Production)
 
-- CloudFront default domain (e.g. `d123.cloudfront.net`) does not match the Ingress host rules (`lms.openedx.local`, `studio.openedx.local`), so a default request can return 404. WAF proof uses a header-based block rule (403) which is independent of host routing.
-- CloudFront origin is configured as HTTP-only in Terraform (`origin_protocol_policy = "http-only"`) because the origin uses a self-signed certificate for placeholder domains. CloudFront requires a publicly trusted origin certificate for HTTPS-to-origin.
-- TLS termination at NGINX Ingress is demonstrated via direct ingress access to `https://lms.openedx.local` / `https://studio.openedx.local` (placeholder domains mapped locally).
+- CloudFront default domain (e.g. `d123.cloudfront.net`) does not match the Ingress host rules (`LMS_HOST`, `CMS_HOST`), so a default request can return 404. WAF proof uses a header-based block rule (403) which is independent of host routing.
+- CloudFront origin is configured as HTTP-only in Terraform (`origin_protocol_policy = "http-only"`) because CloudFront-to-origin HTTPS requires a publicly trusted certificate that matches the configured origin hostname. This repo supports switching to HTTPS-to-origin once that is in place.
+- TLS termination at NGINX Ingress is demonstrated in production-mode via Let’s Encrypt (cert-manager) and in assessment-mode via self-signed TLS on placeholder domains.
 - The post-render apply wrapper enforces `mfe` service type `ClusterIP`; verify with `kubectl -n openedx-prod get svc mfe -o wide`.
 - For real production you would use real DNS + ACM certificates, configure CloudFront alternate domain names that match the Ingress hosts, and switch CloudFront to HTTPS-to-origin.

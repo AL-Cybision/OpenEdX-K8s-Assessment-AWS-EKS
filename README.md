@@ -27,10 +27,17 @@ Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Mei
 Primary runbook (script-driven):
 - `docs/reproduce.md`
 
-## Known Limitations (Assessment Setup)
+## Access Modes (Production vs Assessment)
 
-- Domains are placeholders: `lms.openedx.local`, `studio.openedx.local` (no real DNS).
-- TLS uses a self-signed certificate for these placeholder domains (satisfies “TLS termination at NGINX” for the assessment).
+Production-mode (recommended):
+- Real DNS hostnames: `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>`
+- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt (no `/etc/hosts` hacks)
+
+Assessment-mode (fallback if you don't have a domain):
+- Placeholder hostnames: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
+- Self-signed TLS + local `/etc/hosts` mapping to the ingress LoadBalancer
+
+Notes:
 - CloudFront default domain requests may return 404 because NGINX routes by `Host`. The WAF proof (HTTP/2 403 with `X-Block-Me: 1`) is independent of host routing.
 - EKS API endpoint is public for reproducibility; a real production environment should restrict CIDRs or use private endpoint access.
 
@@ -43,11 +50,11 @@ High-level execution order:
 2. Core add-ons (EBS CSI + `gp3` default + metrics-server): `infra/eksctl/install-core-addons.sh`
 3. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
 4. NGINX ingress controller: `infra/ingress-nginx/install.sh`
-5. (Optional) cert-manager (real domains + Let's Encrypt TLS): `infra/cert-manager/install.sh`
+5. TLS + ingress host routing (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh`
 6. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
 7. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
 8. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
-9. Ingress rules + TLS secret: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+9. (Assessment-mode only) Placeholder ingress + self-signed TLS: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
 10. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
 11. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
 12. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
@@ -120,7 +127,7 @@ openedx-prod-mysql.c0348w0sgvja.us-east-1.rds.amazonaws.com (192.168.112.236:330
 ```
 
 ### 3b) Studio Course Creation + Mongo Persistence + Pod Restart
-Create a course in Studio (`https://studio.openedx.local`), then verify Mongo collections and post-restart persistence.
+Create a course in Studio (at `https://<CMS_HOST>`), then verify Mongo collections and post-restart persistence.
 
 Mongo verification command (no secrets printed):
 ```bash
@@ -160,13 +167,16 @@ kubectl top nodes
 
 Generate load (k6):
 ```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+
 kubectl -n openedx-prod create configmap k6-script \
   --from-file=loadtest-k6.js=infra/k8s/05-hpa/loadtest-k6.js \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n openedx-prod delete job k6-loadtest --ignore-not-found
 
-cat <<'YAML' | kubectl apply -f -
+cat <<YAML | kubectl apply -f -
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -182,6 +192,9 @@ spec:
         - name: k6
           image: grafana/k6:0.49.0
           args: ["run", "--vus", "120", "--duration", "5m", "/scripts/loadtest-k6.js"]
+          env:
+            - name: LMS_HOST
+              value: "${LMS_HOST}"
           volumeMounts:
             - name: scripts
               mountPath: /scripts

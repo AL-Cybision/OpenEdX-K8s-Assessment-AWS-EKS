@@ -10,8 +10,8 @@ Namespaces:
 - `k8s/00-namespaces/namespaces.yaml`
 
 Ingress resources:
-- `k8s/03-ingress/openedx-ingress.yaml` (hosts, TLS, routing, rate-limits)
-- `k8s/03-ingress/real-domain/apply.sh` (optional: real domain + Let’s Encrypt TLS via cert-manager)
+- `k8s/03-ingress/real-domain/apply.sh` (production-mode: real domain + Let’s Encrypt TLS via cert-manager)
+- `k8s/03-ingress/openedx-ingress.yaml` (assessment-mode fallback: placeholder hosts + self-signed TLS + routing, rate-limits)
 - `k8s/01-echo-ingress.yaml` (sanity test ingress used early)
 
 Storage:
@@ -50,7 +50,8 @@ Ingress controller install script (pinned chart version):
 - `infra/ingress-nginx/install.sh`
 
 Ingress routing configuration (NGINX ingress annotations + hosts + TLS):
-- `k8s/03-ingress/openedx-ingress.yaml`
+- Production-mode: `k8s/03-ingress/real-domain/apply.sh`
+- Assessment-mode fallback: `k8s/03-ingress/openedx-ingress.yaml`
 
 ## 4) Helm Charts (If Used)
 

@@ -116,56 +116,79 @@ Apply Tutor manifests using the wrapper (this permanently removes Caddy and inje
 infra/k8s/04-tutor-apply/apply.sh
 ```
 
-Apply ingress rules:
+### Ingress + TLS (Production-Mode, Recommended)
+
+This is the recommended path for **production-like** browser testing:
+- real DNS (no `/etc/hosts`)
+- trusted TLS via Let’s Encrypt (no browser warnings)
+
+Prereqs:
+- DNS records for these hosts point to the `ingress-nginx` LoadBalancer:
+  - `LMS_HOST` (example: `lms.example.com`)
+  - `CMS_HOST` (example: `studio.example.com`)
+  - `apps.<LMS_HOST>` (example: `apps.lms.example.com`)
+
+Install cert-manager:
 ```bash
-k8s/03-ingress/create-selfsigned-tls.sh
-kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
+infra/cert-manager/install.sh
+```
+
+Apply ClusterIssuer + Certificate + Ingress (uses the Tutor-configured hosts):
+```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
+MFE_HOST="apps.${LMS_HOST}"
+
+LETSENCRYPT_EMAIL="you@example.com" \
+LMS_HOST="${LMS_HOST}" \
+CMS_HOST="${CMS_HOST}" \
+MFE_HOST="${MFE_HOST}" \
+TLS_SECRET_NAME="openedx-tls" \
+INGRESS_NAME="openedx" \
+  k8s/03-ingress/real-domain/apply.sh
+
 kubectl -n openedx-prod get ingress openedx
 ```
 
-Fix AuthN/Authoring MFE under HTTPS (required when TLS terminates at NGINX Ingress):
-```bash
-mkdir -p "${HOME}/.local/share/tutor-plugins"
-cp data-layer/tutor/plugins/openedx-mfe-https.py "${HOME}/.local/share/tutor-plugins/openedx-mfe-https.py"
-.venv/bin/tutor plugins enable openedx-mfe-https
-
-infra/k8s/04-tutor-apply/apply.sh
-```
+Note: the Tutor apply wrapper (`infra/k8s/04-tutor-apply/apply.sh`) already enables the
+`openedx-mfe-https` plugin (required for the AuthN/Authoring MFE over HTTPS) and applies
+the MFE runtime env to avoid white-screen config errors.
 
 Verify `mfe` service is internal-only (`ClusterIP`) and not externally exposed via `NodePort`:
 ```bash
 kubectl -n openedx-prod get svc mfe -o jsonpath='{.spec.type}{"\n"}'
 ```
 
-Browser access (with placeholder domains):
+Browser access (production-mode):
+- `https://<LMS_HOST>`
+- `https://<CMS_HOST>`
+- `https://apps.<LMS_HOST>/authn/login`
+
+### Ingress + TLS (Assessment-Mode Fallback)
+
+If you do not have a real domain, you can use placeholder `.local` hostnames with
+self-signed TLS and a local `/etc/hosts` mapping.
+
+Important: this fallback assumes your Tutor config uses placeholder hosts:
+- `LMS_HOST=lms.openedx.local`
+- `CMS_HOST=studio.openedx.local`
+
+Apply ingress rules (self-signed TLS):
 ```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
+MFE_HOST="apps.${LMS_HOST}"
+
+k8s/03-ingress/create-selfsigned-tls.sh
+kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
+kubectl -n openedx-prod get ingress openedx
+
 LB_DNS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
 
-# MFE login uses apps.lms.openedx.local, so include it here.
-printf "\n# OpenEdX Ingress\n%s lms.openedx.local studio.openedx.local apps.lms.openedx.local\n" "$LB_IP" | sudo tee -a /etc/hosts >/dev/null
-```
-
-Optional: Use a real domain + Let’s Encrypt TLS (recommended for production-like browser testing).
-
-This avoids `/etc/hosts` hacks and self-signed TLS warnings.
-
-Prereqs:
-- DNS records `lms.<domain>`, `studio.<domain>`, and `apps.lms.<domain>` point to the ingress-nginx LoadBalancer DNS name.
-- cert-manager installed:
-```bash
-infra/cert-manager/install.sh
-```
-
-Apply ClusterIssuer + Certificate + Ingress (creates a separate Ingress; does not replace the placeholder ingress):
-```bash
-LETSENCRYPT_EMAIL="you@example.com" \
-LMS_HOST="lms.example.com" \
-CMS_HOST="studio.example.com" \
-MFE_HOST="apps.lms.example.com" \
-TLS_SECRET_NAME="openedx-tls-example" \
-INGRESS_NAME="openedx-example" \
-  k8s/03-ingress/real-domain/apply.sh
+printf "\n# OpenEdX Ingress\n%s %s %s\n" "$LB_IP" "$LMS_HOST" "$CMS_HOST" "$MFE_HOST" | sudo tee -a /etc/hosts >/dev/null
 ```
 
 ## 5.1) Create Initial Accounts (Admin + Course Staff)
@@ -211,7 +234,7 @@ kubectl -n openedx-prod exec -it deploy/lms -c lms -- sh -lc '
 ## 5.2) Studio Course Creation + Persistence Validation (Mandatory)
 
 Create one sample course in Studio:
-- Open `https://studio.openedx.local`
+- Open `https://<CMS_HOST>` (example: `https://studio.example.com`)
 - Sign in as the admin user created above
 - Create a new course (for example `compliance-101`)
 - Publish at least one unit/page

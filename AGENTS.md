@@ -62,11 +62,12 @@ High-level execution order:
 5. External data layer: `infra/terraform/apply.sh`
 6. Storage: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
 7. Tutor/Open edX: `infra/k8s/04-tutor-apply/apply.sh` (post-render removes Caddy, adds probes/mounts)
-8. Ingress rules: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
-9. HPA + load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
-10. Observability: `infra/observability/install.sh`
-11. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
-12. Backups: `infra/backups/backup.sh` (see `docs/backup-restore.md`)
+8. Ingress + TLS (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh` (see `docs/reproduce.md`)
+9. (Assessment-mode fallback) Placeholder ingress + self-signed TLS: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+10. HPA + load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
+11. Observability: `infra/observability/install.sh`
+12. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
+13. Backups: `infra/backups/backup.sh` (see `docs/backup-restore.md`)
 
 ## How (Verification)
 
@@ -78,9 +79,13 @@ Kubernetes health:
 Data-layer reachability (from inside the cluster):
 - Use the `verify-net` pod pattern in `docs/reproduce.md` (no secrets printed)
 
-Ingress/LB access (placeholder domains):
-- `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
-- These require `/etc/hosts` mapping to the ingress load balancer IP. See `docs/reproduce.md`.
+Ingress/LB access (production-mode):
+- Real DNS hostnames: `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>`
+- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt (no `/etc/hosts` hacks)
+
+Ingress/LB access (assessment-mode fallback):
+- Placeholder hostnames: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
+- These require local `/etc/hosts` mapping to the ingress LoadBalancer IP. See `docs/reproduce.md`.
 
 ## SES Email Activation (Optional, Production-Style)
 

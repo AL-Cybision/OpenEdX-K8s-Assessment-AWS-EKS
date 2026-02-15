@@ -7,7 +7,7 @@ This guide lists the highest-probability failures for this assessment and the fa
 Symptoms:
 - Browser shows 404/502
 - CloudFront default domain returns 404
-- Login redirects to `apps.lms.openedx.local` and the browser shows DNS error
+- Login redirects to `https://apps.<LMS_HOST>/authn/...` and the browser shows DNS error (assessment-mode only)
 
 Checks:
 ```bash
@@ -18,21 +18,29 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
 Notes:
 - Ingress routes by `Host`. If you curl the NLB hostname without a matching `Host` header, NGINX will return 404.
-- The MFE (micro-frontend) login UI uses `apps.lms.openedx.local`. With placeholder domains, you must map it locally (for example in `/etc/hosts`).
+- The MFE (micro-frontend) login UI uses `apps.<LMS_HOST>`. With placeholder `.local` domains, you must map it locally (for example in `/etc/hosts`).
 - If login/register is stuck on `https://apps.<LMS_HOST>/authn/...`, check that LMS/CMS CORS allow `https://apps.<LMS_HOST>` (see `data-layer/tutor/plugins/openedx-mfe-https.py`).
 
 Test directly against the NLB (replace `NLB_HOSTNAME`):
 ```bash
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
+MFE_HOST="apps.${LMS_HOST}"
+
 NLB_HOSTNAME=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-curl -k -sSI -H 'Host: lms.openedx.local' "https://${NLB_HOSTNAME}/"
-curl -k -sSI -H 'Host: studio.openedx.local' "https://${NLB_HOSTNAME}/"
-curl -k -sSI -H 'Host: apps.lms.openedx.local' "https://${NLB_HOSTNAME}/authn/login"
+curl -k -sSI -H "Host: ${LMS_HOST}" "https://${NLB_HOSTNAME}/"
+curl -k -sSI -H "Host: ${CMS_HOST}" "https://${NLB_HOSTNAME}/"
+curl -k -sSI -H "Host: ${MFE_HOST}" "https://${NLB_HOSTNAME}/authn/login"
 ```
 
 Verify CORS header is present (required for AuthN MFE):
 ```bash
-curl -kIs -H 'Origin: https://apps.lms.openedx.local' \
-  https://lms.openedx.local/api/user/v1/account/registration/ | grep -i access-control-allow-origin
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+
+curl -kIs -H "Origin: https://apps.${LMS_HOST}" \
+  "https://${LMS_HOST}/api/user/v1/account/registration/" | grep -i access-control-allow-origin
 ```
 
 CloudFront note:
