@@ -13,17 +13,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 TUTOR_PLUGINS_DIR="${TUTOR_PLUGINS_DIR:-${HOME}/.local/share/tutor-plugins}"
 
-# Prefer the hostnames already set in Tutor config. Falling back to placeholders
-# is fine for assessment-mode, but we must not accidentally override a real-domain
-# production-mode configuration.
+# Prefer hostnames already set in Tutor config.
 if [[ -z "${LMS_HOST}" ]]; then
   LMS_HOST="$("${TUTOR_BIN}" config printvalue LMS_HOST 2>/dev/null || true)"
 fi
 if [[ -z "${CMS_HOST}" ]]; then
   CMS_HOST="$("${TUTOR_BIN}" config printvalue CMS_HOST 2>/dev/null || true)"
 fi
-LMS_HOST="${LMS_HOST:-lms.openedx.local}"
-CMS_HOST="${CMS_HOST:-studio.openedx.local}"
+if [[ -z "${LMS_HOST}" || -z "${CMS_HOST}" ]]; then
+  echo "LMS_HOST/CMS_HOST are required. Set them via Tutor config before apply:" >&2
+  echo "  .venv/bin/tutor config save -s LMS_HOST=lms.<domain> -s CMS_HOST=studio.<domain>" >&2
+  exit 1
+fi
+
+if [[ "${LMS_HOST}" == *.local || "${CMS_HOST}" == *.local ]]; then
+  echo "Placeholder .local hostnames are not supported in this repository." >&2
+  echo "Use real DNS hostnames (for example lms.<domain>, studio.<domain>)." >&2
+  exit 1
+fi
 
 # Ensure post-render scripts (python) see these values even when defaults are used.
 export LMS_HOST CMS_HOST
@@ -48,7 +55,7 @@ kubectl kustomize "${TUTOR_ENV_DIR}" | \
   kubectl -n "${NAMESPACE}" apply -f -
 
 # Keep MFE runtime env complete to avoid white-screen config errors in
-# learner-dashboard/auth pages when running with placeholder local domains.
+# learner-dashboard/auth pages.
 kubectl -n "${NAMESPACE}" set env deployment/mfe \
   LOGO_URL="https://${LMS_HOST}/theming/asset/images/logo.png" \
   CREDIT_PURCHASE_URL="https://${LMS_HOST}/dashboard" \

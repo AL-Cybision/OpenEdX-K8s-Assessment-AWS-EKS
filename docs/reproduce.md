@@ -28,12 +28,22 @@ infra/eksctl/create-cluster.sh
 ```
 
 Note: by default this also runs `infra/eksctl/install-core-addons.sh` after cluster creation (`INSTALL_CORE_ADDONS=true`).
+`create-cluster.sh` auto-restricts EKS public endpoint access to your current public IP (`/32`) and enables private endpoint access.
+To pin specific CIDRs instead of auto-detection:
+```bash
+EKS_PUBLIC_ACCESS_CIDRS="203.0.113.10/32,198.51.100.0/24" infra/eksctl/create-cluster.sh
+```
 
 If you already have a cluster, skip this.
 
 Destroy when finished:
 ```bash
 infra/eksctl/delete-cluster.sh
+```
+
+Harden an existing cluster endpoint (recommended):
+```bash
+infra/eksctl/harden-endpoint.sh
 ```
 
 ## 0.2) Core Add-ons (Mandatory for this stack)
@@ -86,7 +96,7 @@ Verify (no secrets printed):
 ```bash
 RDS_ENDPOINT=$(terraform -chdir=infra/terraform output -raw rds_endpoint)
 aws rds describe-db-instances --region us-east-1 \
-  --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].[DBInstanceIdentifier,PubliclyAccessible,Engine,EngineVersion]" \
+  --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].[DBInstanceIdentifier,PubliclyAccessible,MultiAZ,Engine,EngineVersion]" \
   --output table
 ```
 
@@ -116,11 +126,11 @@ Apply Tutor manifests using the wrapper (this permanently removes Caddy and inje
 infra/k8s/04-tutor-apply/apply.sh
 ```
 
-### Ingress + TLS (Production-Mode, Recommended)
+### Ingress + TLS (Production-Mode)
 
-This is the recommended path for **production-like** browser testing:
-- real DNS (no `/etc/hosts`)
-- trusted TLS via Let’s Encrypt (no browser warnings)
+This repository uses a production-mode access path only:
+- real DNS
+- trusted TLS via Let’s Encrypt
 
 Prereqs:
 - DNS records for these hosts point to the `ingress-nginx` LoadBalancer:
@@ -164,32 +174,6 @@ Browser access (production-mode):
 - `https://<LMS_HOST>`
 - `https://<CMS_HOST>`
 - `https://apps.<LMS_HOST>/authn/login`
-
-### Ingress + TLS (Assessment-Mode Fallback)
-
-If you do not have a real domain, you can use placeholder `.local` hostnames with
-self-signed TLS and a local `/etc/hosts` mapping.
-
-Important: this fallback assumes your Tutor config uses placeholder hosts:
-- `LMS_HOST=lms.openedx.local`
-- `CMS_HOST=studio.openedx.local`
-
-Apply ingress rules (self-signed TLS):
-```bash
-TUTOR_BIN=".venv/bin/tutor"
-LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
-CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
-MFE_HOST="apps.${LMS_HOST}"
-
-k8s/03-ingress/create-selfsigned-tls.sh
-kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
-kubectl -n openedx-prod get ingress openedx
-
-LB_DNS=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-LB_IP=$(getent ahostsv4 "$LB_DNS" | awk '{print $1; exit}')
-
-printf "\n# OpenEdX Ingress\n%s %s %s\n" "$LB_IP" "$LMS_HOST" "$CMS_HOST" "$MFE_HOST" | sudo tee -a /etc/hosts >/dev/null
-```
 
 ## 5.1) Create Initial Accounts (Admin + Course Staff)
 
@@ -363,7 +347,7 @@ Rerun note:
 
 Production-hardening option (when ingress has a publicly trusted certificate):
 ```bash
-ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
+ORIGIN_DOMAIN_NAME=lms.example.com ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
 ```
 
 ## 9) Backups

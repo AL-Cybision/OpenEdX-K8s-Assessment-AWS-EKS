@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Creates point-in-time backups for external data services and EBS-backed PVC volumes.
+# Scope: RDS snapshot + EC2 volume snapshots + openedx-prod EBS CSI PV snapshots.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REGION="us-east-1"

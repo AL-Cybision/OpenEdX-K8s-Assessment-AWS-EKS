@@ -19,10 +19,8 @@ TUTOR_BIN=".venv/bin/tutor"
 LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
 CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
 
-# Assessment-mode: self-signed TLS -> keep -k
-# Production-mode: trusted TLS (Let's Encrypt) -> you can remove -k
-curl -kIs "https://${LMS_HOST}/heartbeat" | head
-curl -kIs "https://${CMS_HOST}/heartbeat" | head
+curl -Is "https://${LMS_HOST}/heartbeat" | head
+curl -Is "https://${CMS_HOST}/heartbeat" | head
 ```
 
 ## 3) Create Accounts (Admin + Staff)

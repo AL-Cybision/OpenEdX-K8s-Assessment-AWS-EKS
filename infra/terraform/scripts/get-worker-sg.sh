@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Terraform external-data helper: resolves the worker security-group ID for SG rules.
+# Reads JSON from stdin and writes JSON to stdout (for Terraform external data source).
+
 INPUT=$(cat)
 CLUSTER_NAME=$(echo "$INPUT" | jq -r '.cluster_name')
 AWS_REGION=$(echo "$INPUT" | jq -r '.aws_region')

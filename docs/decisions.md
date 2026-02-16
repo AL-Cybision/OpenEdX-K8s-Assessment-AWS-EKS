@@ -27,16 +27,17 @@ Node placement:
 - Tradeoff: outbound access from private subnets requires NAT or VPC endpoints
 
 EKS API endpoint:
-- Choice: cluster endpoint remains public for simplicity in a short assessment timeline
-- Rationale: easiest reproducibility for reviewers; avoids needing VPN/bastion
-- Tradeoff: for real production, prefer private endpoint and restricted CIDRs
+- Choice: enable private endpoint access and restrict public endpoint access to operator CIDRs
+- Rationale: keeps kubectl access practical while reducing public exposure
+- Implementation: `infra/eksctl/create-cluster.sh` auto-restricts CIDR to the current public IP, and `infra/eksctl/harden-endpoint.sh` applies the same hardening to existing clusters
+- Tradeoff: if operator public IP changes, CIDR must be updated before public-endpoint access works again
 
 ## External Data Layer
 
 MySQL:
 - Choice: RDS MySQL 8.0.x (non-Aurora)
 - Rationale: matches Tutor/Open edX expectations; managed backups and maintenance
-- Configuration: parameter group sets `utf8mb4` charset/collation to avoid Unicode issues
+- Configuration: parameter group sets `utf8mb4` charset/collation to avoid Unicode issues; Multi-AZ is enabled for higher availability
 
 MongoDB/Redis/Elasticsearch:
 - Choice: EC2 instances (private only)
@@ -85,9 +86,8 @@ Remove Caddy permanently:
 TLS termination:
 - Choice: terminate TLS at NGINX ingress
 - Production-mode: cert-manager + Let’s Encrypt for trusted TLS on real domains
-- Assessment-mode fallback: self-signed TLS on placeholder `.local` hostnames
 - Rationale: meets the requirement and matches real production patterns (trusted certs at the edge)
-- Tradeoff: real domains require DNS + ACME validation (more setup than placeholder `.local`)
+- Tradeoff: real domains require DNS + ACME validation and can take longer to provision
 
 ## Scalability + Operations
 
@@ -110,14 +110,13 @@ CloudFront + WAF:
 - Choice: CloudFront distribution in front of the ingress NLB with a WAF rule that blocks `X-Block-Me: 1`
 - Rationale: meets requirement and provides simple, unambiguous proof (HTTP/2 403)
 - Tradeoff: without real DNS/hostnames, default CloudFront requests can return 404 due to Ingress host routing
-- Origin protocol: CloudFront uses HTTP-to-origin (`origin_protocol_policy = "http-only"`) because the NGINX Ingress uses a self-signed certificate for placeholder domains and CloudFront requires a publicly trusted cert for HTTPS-to-origin
+- Origin protocol: CloudFront uses HTTP-to-origin (`origin_protocol_policy = "http-only"`) because HTTPS-to-origin requires a trusted certificate matching the configured origin hostname
 - Hardening path: `infra/cloudfront-waf/apply.sh` supports `ORIGIN_PROTOCOL_POLICY=https-only` once a trusted origin certificate is in place
 
-## What Would Be Hardened For Real Production (Not Required For Assessment)
+## Next Hardening Candidates (After Assessment)
 
 - Real domains + ACM certificates for both CloudFront and Ingress hostnames
-- Private EKS endpoint + restricted CIDRs; remove `0.0.0.0/0` publicAccessCidrs
-- RDS Multi-AZ + longer retention + automated snapshots/restore drills
+- Increase RDS backup retention and run restore drills on a schedule
 - Replace EC2 Redis with ElastiCache; EC2 Elasticsearch with OpenSearch (if allowed)
 - Patch management and automated AMI updates for EC2 data nodes
 - Network policies, resource quotas/limits per namespace

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installs cert-manager (used for production-style TLS via Let's Encrypt).
-# This is optional for the assessment runbook, but recommended for real domains
-# to avoid browser issues from self-signed certificates.
+# Installs cert-manager for production TLS via Let's Encrypt.
+# This repository uses real-domain trusted TLS as the default ingress path.
 
 NAMESPACE="${NAMESPACE:-cert-manager}"
 RELEASE="${RELEASE:-cert-manager}"
@@ -22,4 +21,3 @@ helm upgrade --install "${RELEASE}" jetstack/cert-manager \
 kubectl -n "${NAMESPACE}" rollout status deploy/cert-manager --timeout=10m
 kubectl -n "${NAMESPACE}" rollout status deploy/cert-manager-webhook --timeout=10m
 kubectl -n "${NAMESPACE}" rollout status deploy/cert-manager-cainjector --timeout=10m
-

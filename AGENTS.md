@@ -27,7 +27,10 @@ The scoring is driven by:
 
 Primary entry points:
 - `README.md`: submission overview + evidence images (what reviewers will read first)
+- `docs/operator-quickstart.md`: shortest operator path (deploy/verify/pause/resume)
 - `docs/reproduce.md`: assessor-friendly step-by-step runbook (script-driven)
+- `docs/repo-walkthrough.md`: repository map (what each folder/script is for)
+- `docs/repo-cleanup.md`: removed legacy artifacts + optional leftovers
 - `docs/config-artifacts.md`: index of configuration artifacts (YAML/TF/scripts)
 
 Infrastructure:
@@ -57,14 +60,14 @@ Follow `docs/reproduce.md`. It is the source of truth for exact commands.
 
 High-level execution order:
 1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
-2. Core add-ons: `infra/eksctl/install-core-addons.sh` (EBS CSI, gp3 default, metrics-server)
-3. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
-4. NGINX ingress: `infra/ingress-nginx/install.sh`
-5. External data layer: `infra/terraform/apply.sh`
-6. Storage: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
-7. Tutor/Open edX: `infra/k8s/04-tutor-apply/apply.sh` (post-render removes Caddy, adds probes/mounts)
-8. Ingress + TLS (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh` (see `docs/reproduce.md`)
-9. (Assessment-mode fallback) Placeholder ingress + self-signed TLS: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+2. (Recommended for existing clusters) Harden EKS endpoint CIDRs + private access: `infra/eksctl/harden-endpoint.sh`
+3. Core add-ons: `infra/eksctl/install-core-addons.sh` (EBS CSI, gp3 default, metrics-server)
+4. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
+5. NGINX ingress: `infra/ingress-nginx/install.sh`
+6. External data layer: `infra/terraform/apply.sh`
+7. Storage: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
+8. Tutor/Open edX: `infra/k8s/04-tutor-apply/apply.sh` (post-render removes Caddy, adds probes/mounts)
+9. Ingress + TLS (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh` (see `docs/reproduce.md`)
 10. HPA + load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
 11. Observability: `infra/observability/install.sh`
 12. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`
@@ -82,11 +85,7 @@ Data-layer reachability (from inside the cluster):
 
 Ingress/LB access (production-mode):
 - Real DNS hostnames: `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>`
-- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt (no `/etc/hosts` hacks)
-
-Ingress/LB access (assessment-mode fallback):
-- Placeholder hostnames: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
-- These require local `/etc/hosts` mapping to the ingress LoadBalancer IP. See `docs/reproduce.md`.
+- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt
 
 ## SES Email Activation (Optional, Production-Style)
 
@@ -120,6 +119,7 @@ Notes:
 
 - AWS region: `us-east-1`
 - Kubernetes platform: **AWS EKS only**
+- EKS endpoint must not remain open (`0.0.0.0/0`); restrict public CIDRs and keep private endpoint enabled
 - Databases must be external to Kubernetes (no DB containers in-cluster)
 - Data-layer must not be publicly accessible; only worker security group may reach DB ports
 - Keep costs low (smallest reasonable instance types)
@@ -133,8 +133,8 @@ Notes:
   - Fix via `infra/eksctl/install-core-addons.sh`, then `kubectl top nodes`.
 - Meilisearch PVC stuck: EBS CSI or default `gp3` StorageClass missing.
   - Ensure EBS CSI add-on + `gp3` default, then recreate PVC.
-- MFE white screen / auth redirect loops with `.local` domains:
-  - Use consistent HTTPS hostnames and the HTTPS MFE plugin documented in `docs/reproduce.md`.
-  - Real DNS + trusted certs (Route53/ACM or cert-manager) is the production fix; `.local` is assessment-mode.
+- MFE white screen / auth redirect loops:
+  - Verify all LMS/CMS/MFE hosts are real DNS entries and HTTPS-only.
+  - Confirm the HTTPS plugin is enabled (see `infra/k8s/04-tutor-apply/apply.sh`).
 - SES mail rejected:
   - Verify SES identities (domain + DKIM) and sandbox/production access status.

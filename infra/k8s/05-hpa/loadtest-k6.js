@@ -10,7 +10,10 @@ export const options = {
 };
 
 export default function () {
-  const host = __ENV.LMS_HOST || 'lms.openedx.local';
+  const host = __ENV.LMS_HOST;
+  if (!host) {
+    throw new Error('LMS_HOST env var is required');
+  }
   http.get('http://lms:8000/', { headers: { Host: host } });
   sleep(1);
 }

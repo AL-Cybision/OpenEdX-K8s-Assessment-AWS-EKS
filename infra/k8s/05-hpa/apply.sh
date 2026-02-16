@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Applies resource requests/limits and HPA manifests for lms/cms.
+# This script assumes metrics-server is healthy (kubectl top must work).
+
 NAMESPACE="${NAMESPACE:-openedx-prod}"
 LMS_CPU_REQUEST="${LMS_CPU_REQUEST:-200m}"
 LMS_MEM_REQUEST="${LMS_MEM_REQUEST:-1Gi}"

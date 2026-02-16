@@ -1,6 +1,7 @@
 # Documentation Index
 
 - `AGENTS.md` — Agent/human operating guide (what/why/where/how/when)
+- `docs/repo-walkthrough.md` — Repository map (what each directory/file is for)
 - `docs/external-data-layer.md` — External database layer provisioning and verification
 - `docs/tutor-k8s.md` — Tutor installation, external DB wiring, and EKS deployment (with NGINX ingress)
 - `docs/hpa-loadtest.md` — HPA manifests, k6 load test, and scaling evidence
@@ -16,6 +17,8 @@
 - `docs/references.md` — Upstream docs used as reference (Open edX, Tutor, AWS EKS, Kubernetes)
 - `docs/config-artifacts.md` — Artifact mapping (files to rubric checklist)
 - `docs/reproduce.md` — Assessor-friendly reproduction runbook (script-driven)
+- `docs/operator-quickstart.md` — Minimal operator path: deploy, verify, pause, resume
+- `docs/repo-cleanup.md` — Cleanup decisions (removed legacy artifacts + what remains optional)
 - `infra/eksctl/` — Optional: EKS cluster creation/deletion automation (eksctl)
 - `infra/cert-manager/` — Production-mode: cert-manager install (Let’s Encrypt TLS at NGINX Ingress)
 - `docs/upstream-guidance.md` — Research summary: upstream docs and how this repo applies best practices

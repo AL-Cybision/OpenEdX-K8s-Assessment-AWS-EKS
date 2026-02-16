@@ -1,22 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Deploys/updates CloudFront + WAF in front of ingress-nginx.
+# Includes rerun-safe imports when same-named resources already exist in AWS.
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 command -v aws >/dev/null 2>&1 || { echo "aws not found in PATH" >&2; exit 1; }
 
-LB_HOSTNAME=$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 ORIGIN_PROTOCOL_POLICY="${ORIGIN_PROTOCOL_POLICY:-http-only}"
+ORIGIN_DOMAIN_NAME="${ORIGIN_DOMAIN_NAME:-}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 WAF_NAME="${WAF_NAME:-openedx-prod-cf-waf}"
 CF_COMMENT="${CF_COMMENT:-OpenEdX NGINX Ingress via CloudFront}"
+LB_HOSTNAME="$(kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
 
 if [ -z "${LB_HOSTNAME}" ]; then
   echo "Failed to detect ingress-nginx LB hostname" >&2
   exit 1
 fi
 
-echo "Using LB hostname: ${LB_HOSTNAME}"
+if [ -z "${ORIGIN_DOMAIN_NAME}" ]; then
+  ORIGIN_DOMAIN_NAME="${LB_HOSTNAME}"
+fi
+
+if [ "${ORIGIN_PROTOCOL_POLICY}" = "https-only" ] && [[ "${ORIGIN_DOMAIN_NAME}" =~ \.elb\..*amazonaws\.com$ ]]; then
+  echo "Refusing https-only with ELB hostname origin (${ORIGIN_DOMAIN_NAME})." >&2
+  echo "Set ORIGIN_DOMAIN_NAME to a hostname with a trusted certificate (for example lms.yourdomain.com)." >&2
+  exit 1
+fi
+
+echo "Using origin domain: ${ORIGIN_DOMAIN_NAME}"
 echo "Using CloudFront origin protocol policy: ${ORIGIN_PROTOCOL_POLICY}"
 
 terraform -chdir="${SCRIPT_DIR}" init -input=false
@@ -30,7 +44,7 @@ if ! terraform -chdir="${SCRIPT_DIR}" state list 2>/dev/null | grep -qx "aws_waf
     WAF_IMPORT_ID="${EXISTING_WAF_ID}/${WAF_NAME}/CLOUDFRONT"
     echo "Importing existing WAF WebACL into state: ${WAF_IMPORT_ID}"
     terraform -chdir="${SCRIPT_DIR}" import -input=false \
-      -var "origin_domain_name=${LB_HOSTNAME}" \
+      -var "origin_domain_name=${ORIGIN_DOMAIN_NAME}" \
       -var "origin_protocol_policy=${ORIGIN_PROTOCOL_POLICY}" \
       aws_wafv2_web_acl.this "${WAF_IMPORT_ID}" >/dev/null
   fi
@@ -42,13 +56,13 @@ if ! terraform -chdir="${SCRIPT_DIR}" state list 2>/dev/null | grep -qx "aws_clo
   if [ -n "${EXISTING_CF_ID}" ] && [ "${EXISTING_CF_ID}" != "None" ]; then
     echo "Importing existing CloudFront distribution into state: ${EXISTING_CF_ID}"
     terraform -chdir="${SCRIPT_DIR}" import -input=false \
-      -var "origin_domain_name=${LB_HOSTNAME}" \
+      -var "origin_domain_name=${ORIGIN_DOMAIN_NAME}" \
       -var "origin_protocol_policy=${ORIGIN_PROTOCOL_POLICY}" \
       aws_cloudfront_distribution.this "${EXISTING_CF_ID}" >/dev/null
   fi
 fi
 
 terraform -chdir="${SCRIPT_DIR}" plan -input=false -out tfplan \
-  -var "origin_domain_name=${LB_HOSTNAME}" \
+  -var "origin_domain_name=${ORIGIN_DOMAIN_NAME}" \
   -var "origin_protocol_policy=${ORIGIN_PROTOCOL_POLICY}"
 terraform -chdir="${SCRIPT_DIR}" apply -input=false tfplan

@@ -11,8 +11,6 @@ Namespaces:
 
 Ingress resources:
 - `k8s/03-ingress/real-domain/apply.sh` (production-mode: real domain + Let’s Encrypt TLS via cert-manager)
-- `k8s/03-ingress/openedx-ingress.yaml` (assessment-mode fallback: placeholder hosts + self-signed TLS + routing, rate-limits)
-- `k8s/01-echo-ingress.yaml` (sanity test ingress used early)
 
 Storage:
 - `k8s/02-storage/storageclass-gp3.yaml` (EBS gp3 StorageClass)
@@ -50,8 +48,7 @@ Ingress controller install script (pinned chart version):
 - `infra/ingress-nginx/install.sh`
 
 Ingress routing configuration (NGINX ingress annotations + hosts + TLS):
-- Production-mode: `k8s/03-ingress/real-domain/apply.sh`
-- Assessment-mode fallback: `k8s/03-ingress/openedx-ingress.yaml`
+- `k8s/03-ingress/real-domain/apply.sh`
 
 ## 4) Helm Charts (If Used)
 
@@ -74,6 +71,7 @@ cert-manager (production-mode TLS for real domains via Let’s Encrypt):
 DB provisioning (Terraform):
 - `infra/terraform/` (RDS + EC2 data nodes + SG restrictions + optional S3 gateway endpoint)
 - Script entrypoint: `infra/terraform/apply.sh`
+- Production-default RDS HA flag: `infra/terraform/terraform.tfvars` (`rds_multi_az = true`)
 
 EC2 bootstrap (user-data):
 - `data-layer/user-data/mongo.sh` (MongoDB install + auth + bind)
@@ -93,8 +91,7 @@ Controller:
 - `infra/ingress-nginx/values.yaml`
 
 Ingress resources:
-- `k8s/03-ingress/openedx-ingress.yaml`
-- `k8s/01-echo-ingress.yaml`
+- `k8s/03-ingress/real-domain/apply.sh`
 
 ## Related Deliverables (Docs)
 
@@ -108,6 +105,7 @@ Evidence checklist (screenshots + terminal proof):
 
 Deployment automation entrypoints:
 - `docs/reproduce.md` (end-to-end runbook)
+- `infra/eksctl/harden-endpoint.sh` (EKS endpoint private access + public CIDR restriction)
 - `infra/eksctl/install-core-addons.sh` (EBS CSI + gp3 default + metrics-server)
 - `infra/cert-manager/install.sh` (production-mode TLS: cert-manager + Let’s Encrypt)
 - `infra/terraform/apply.sh` (external data layer)

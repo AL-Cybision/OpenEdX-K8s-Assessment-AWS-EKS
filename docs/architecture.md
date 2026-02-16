@@ -1,196 +1,102 @@
 # Architecture & Network Flow
 
-This document explains what is deployed, where it runs (AWS/Kubernetes), and how traffic/data flows through the system.
+This document describes the deployed topology, request flow, and operational boundaries.
 
 ## Scope
 
 - Region: `us-east-1`
 - EKS cluster: `openedx-eks`
-- Kubernetes namespaces:
-- `openedx-prod` (Open edX workloads)
-- `ingress-nginx` (NGINX Ingress Controller)
-- `observability` (Prometheus/Grafana + Loki)
-- Domains (production-mode): `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>` (cert-manager + Let’s Encrypt)
-- Assessment-mode fallback: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local` (self-signed + `/etc/hosts`)
-- Databases are external to Kubernetes (RDS + EC2), private only.
+- Namespaces:
+  - `openedx-prod` (Open edX workloads)
+  - `ingress-nginx` (ingress controller)
+  - `observability` (Prometheus/Grafana/Loki)
+- Public hostnames (production path):
+  - `lms.<domain>`
+  - `studio.<domain>`
+  - `apps.lms.<domain>`
+- Databases are external to Kubernetes and private-only:
+  - RDS MySQL
+  - EC2 MongoDB
+  - EC2 Redis
+  - EC2 Elasticsearch
 
-## Components (By Layer)
+## Components
 
-Edge + security:
-- AWS WAF attached to CloudFront (header-based block rule for proof)
-- CloudFront distribution (origin: the ingress NLB)
-- AWS NLB created by `ingress-nginx` Service type `LoadBalancer`
-- NGINX Ingress Controller terminates TLS (direct ingress access) and routes to services
+Edge:
+- Authoritative DNS zone (Route53 or external registrar DNS) for `lms/studio/apps` records
+- CloudFront + WAF (edge security path)
+- NLB from ingress-nginx `LoadBalancer` service
+- NGINX Ingress Controller (TLS termination for direct ingress path)
 
-Application (EKS pods in `openedx-prod`):
-- LMS deployment + service
-- CMS (Studio) deployment + service
-- LMS/CMS workers (Celery) deployments
-- MFE deployment + service
-- SMTP deployment + service
+Application (`openedx-prod`):
+- `lms`, `cms`, `mfe`, `lms-worker`, `cms-worker`, `smtp`
+- HPA on `lms` and `cms`
 
-Data layer (external to Kubernetes, private only):
-- RDS MySQL 8.0.x (Open edX relational DB)
-- MongoDB (EC2) for Open edX document store
-- Redis (EC2) for cache/broker
-- Elasticsearch (EC2) for search backend (enabled via Tutor plugin)
-
-Storage:
-- EFS (RWX) for shared media/uploads mounted into LMS/CMS at `/openedx/media`
-- EBS CSI + `gp3` default StorageClass (baseline for dynamic PV provisioning)
+Storage/Data:
+- EFS RWX PVC for `/openedx/media`
+- External MySQL/Mongo/Redis/Elasticsearch
 
 Observability:
-- kube-prometheus-stack (Prometheus, Grafana, Alertmanager)
-- Loki + Promtail (cluster log collection)
+- kube-prometheus-stack (Prometheus, Alertmanager, Grafana)
+- Loki stack
 
-Backups:
-- RDS snapshots (manual)
-- EC2 EBS snapshots (manual)
-- EFS media: AWS Backup / EFS backup policy (documented)
-
-## Kubernetes Layout (What Runs Where)
-
-`ingress-nginx`:
-- Deployment: `ingress-nginx-controller` (replicas=2)
-- Service: `ingress-nginx-controller` (type `LoadBalancer` -> NLB)
-
-`openedx-prod`:
-- Deployments: `lms`, `cms`, `lms-worker`, `cms-worker`, `mfe`, `smtp`
-- Ingress: `openedx` (hosts `LMS_HOST`, `CMS_HOST`, `apps.<LMS_HOST>`)
-- HPA: `lms-hpa`, `cms-hpa` (min=2, max=6, CPU target 70%)
-- PVC: `openedx-media` (RWX, EFS)
-
-`observability`:
-- Helm releases: `kube-prometheus-stack`, `loki-stack`
-- Grafana includes Prometheus + Loki data sources (Loki auto-provisioned)
-
-## Network + Security Model
-
-Subnets:
-- NLB runs in public subnets (created/managed by AWS)
-- EKS worker nodes run in private subnets
-- EC2 DB instances + RDS run in private subnets
-
-Security groups (SG) intent:
-- DB SGs do not allow public access and only allow inbound from the EKS worker node SG
-- EFS SG allows NFS (2049/tcp) inbound from the EKS worker node SG
-
-Ports (high-level):
-- Internet -> CloudFront: 443
-- CloudFront -> NLB: 80 (HTTP to origin, assessment-mode)
-- NGINX -> LMS/CMS services: 8000/tcp
-- Pods -> RDS MySQL: 3306/tcp
-- Pods -> MongoDB: 27017/tcp
-- Pods -> Redis: 6379/tcp
-- Pods -> Elasticsearch: 9200/tcp
-- Pods -> EFS mount targets: 2049/tcp
-
-## Ports and Access Matrix
-
-This table summarizes the minimum required network paths for the deployment.
-
-| From | To | Port | Why |
-|---|---|---:|---|
-| Internet | CloudFront | 443 | public entrypoint |
-| CloudFront | NLB (ingress-nginx) | 80 | edge to origin (HTTP, assessment-mode) |
-| NLB | NGINX Ingress Controller pods | 443/80 | TLS termination + routing |
-| NGINX Ingress | LMS/CMS services | 8000 | app traffic |
-| LMS/CMS/Workers pods | RDS MySQL | 3306 | relational DB |
-| LMS/CMS/Workers pods | MongoDB EC2 | 27017 | document store |
-| LMS/CMS/Workers pods | Redis EC2 | 6379 | cache/broker |
-| LMS/CMS pods | Elasticsearch EC2 | 9200 | search |
-| EKS worker nodes | EFS mount targets | 2049 | RWX media/uploads |
-
-Security note:
-- DB/EFS resources are private and SG-restricted so only the EKS worker SG can initiate traffic to these ports.
-
-## Architecture Diagram
+## Diagram 1: Edge & DNS Flow
 
 ```mermaid
 flowchart LR
-  USER["User Browser"]
-  WAF["AWS WAF"]
-  CF["CloudFront"]
-  NLB["AWS NLB ingress nginx service"]
+  U[User Browser]
+  DNS[DNS zone Route53 or registrar]
+  CF[CloudFront]
+  WAF[WAF WebACL]
+  NLB[NLB ingress]
+  NGX[NGINX ingress controller]
 
-  USER --> CF
-  WAF -. attached to .-> CF
-  USER -. direct validation path .-> NLB
-  CF --> NLB
+  U --> DNS
+  DNS -->|lms studio apps| CF
+  DNS -->|direct validation path| NLB
 
-  subgraph VPC["VPC us east 1"]
-    direction LR
+  WAF -. attached .-> CF
+  CF -->|origin HTTP currently| NLB
+  NLB --> NGX
+```
 
-    subgraph PUB["Public subnets"]
-      NLB
+TLS note:
+- Viewer TLS: browser to CloudFront, and browser to NLB/NGINX on direct ingress path.
+- Origin TLS (CloudFront to NGINX) is currently `http-only` by design in this repo and can be hardened to `https-only` once origin hostname/certificate alignment is in place.
+
+## Diagram 2: Kubernetes Runtime Flow
+
+```mermaid
+flowchart TB
+  subgraph EKS[openedx-eks]
+    subgraph NS1[ingress-nginx]
+      NGX[NGINX ingress]
     end
 
-    subgraph PRIV["Private subnets"]
-      direction LR
+    subgraph NS2[openedx-prod]
+      LMS[LMS]
+      CMS[CMS Studio]
+      MFE[MFE]
+      LMSW[LMS worker]
+      CMSW[CMS worker]
+      SMTP[SMTP relay]
+      HPA[HPA lms and cms]
+    end
 
-      subgraph EKS["EKS cluster openedx eks"]
-        direction TB
-
-        subgraph INGRESS["Namespace ingress nginx"]
-          NGX["NGINX Ingress Controller"]
-        end
-
-        subgraph APP["Namespace openedx prod"]
-          LMS["LMS"]
-          CMS["CMS Studio"]
-          MFE["MFE"]
-          LMSW["LMS Worker"]
-          CMSW["CMS Worker"]
-          SMTP["SMTP"]
-          HPA["HPA lms cms"]
-        end
-
-        subgraph OBS["Namespace observability"]
-          PROM["Prometheus"]
-          GRAF["Grafana"]
-          LOKI["Loki"]
-          ALERT["Alertmanager"]
-        end
-      end
-
-      subgraph DATA["External data layer outside Kubernetes private"]
-        RDS[("RDS MySQL 8.0")]
-        MONGO[("MongoDB EC2")]
-        REDIS[("Redis EC2")]
-        ES[("Elasticsearch EC2")]
-      end
-
-      subgraph STORAGE["Storage layer"]
-        EFS[("EFS RWX openedx media")]
-      end
+    subgraph NS3[observability]
+      PROM[Prometheus]
+      GRAF[Grafana]
+      LOKI[Loki]
+      ALERT[Alertmanager]
     end
   end
 
-  NLB --> NGX
   NGX --> LMS
   NGX --> CMS
   NGX --> MFE
 
-  LMS --> RDS
-  LMS --> MONGO
-  LMS --> REDIS
-  LMS --> ES
-  LMSW --> REDIS
-  LMSW --> RDS
-  LMSW --> MONGO
-  CMS --> RDS
-  CMS --> MONGO
-  CMS --> REDIS
-  CMS --> ES
-  CMSW --> REDIS
-  CMSW --> RDS
-  CMSW --> MONGO
-
-  LMS --> EFS
-  CMS --> EFS
-
-  LMS -. metrics/logs .-> PROM
-  CMS -. metrics/logs .-> PROM
+  LMS -. metrics .-> PROM
+  CMS -. metrics .-> PROM
   LMSW -. logs .-> LOKI
   CMSW -. logs .-> LOKI
   GRAF --> PROM
@@ -198,43 +104,82 @@ flowchart LR
   PROM --> ALERT
 ```
 
-## Network Flow Diagram
+## Diagram 3: Data, AZ, and Egress View
 
 ```mermaid
-flowchart TD
-  A1["1 User request"] --> A2["2 CloudFront edge"]
-  A2 --> A3["3 WAF rule evaluation"]
-  A3 -->|allowed| A4["4 Forward to NLB origin"]
-  A3 -->|blocked header x block me equals 1| A403["HTTP 403"]
-  A1 -. direct validation path .-> A4B["4b Direct to NLB for validation"]
+flowchart LR
+  subgraph AZA[us-east-1a]
+    NODA[EKS nodes]
+    REDIS[Redis EC2]
+  end
 
-  A4 --> A5["5 NGINX Ingress host routing"]
-  A4B --> A5
-  A5 --> A6["LMS CMS MFE service"]
-  A6 --> A7["6 Pod business logic"]
+  subgraph AZC[us-east-1c]
+    NODC[EKS nodes]
+    MONGO[Mongo EC2]
+    ES[Elasticsearch EC2]
+  end
 
-  A7 --> D1[("RDS MySQL 3306")]
-  A7 --> D2[("MongoDB 27017")]
-  A7 --> D3[("Redis 6379")]
-  A7 --> D4[("Elasticsearch 9200")]
-  A7 --> D5[("EFS media 2049")]
+  RDS[RDS MySQL Multi-AZ]
+  EFS[EFS regional RWX]
+  NAT[NAT gateway single]
+  NET[Public internet APIs]
+  S3EP[S3 gateway endpoint optional]
+  S3[S3]
 
-  A7 -. metrics .-> O1["Prometheus"]
-  A7 -. logs .-> O2["Loki"]
-  O1 --> O3["Grafana dashboards"]
-  O2 --> O3
+  NODA --> RDS
+  NODC --> RDS
+  NODA --> MONGO
+  NODC --> MONGO
+  NODA --> REDIS
+  NODC --> REDIS
+  NODA --> ES
+  NODC --> ES
 
-  D1 --> B1["Backup path RDS snapshot"]
-  D2 --> B2["Backup path EBS snapshot"]
-  D3 --> B3["Backup path EBS snapshot"]
-  D4 --> B4["Backup path EBS snapshot"]
-  D5 --> B5["Backup path EFS backup policy"]
+  NODA --> EFS
+  NODC --> EFS
+
+  NODA --> NAT
+  NODC --> NAT
+  NAT --> NET
+
+  NODA --> S3EP
+  NODC --> S3EP
+  S3EP --> S3
 ```
 
-## Notes (Assessment vs Real Production)
+## Ports and Access Matrix
 
-- CloudFront default domain (e.g. `d123.cloudfront.net`) does not match the Ingress host rules (`LMS_HOST`, `CMS_HOST`), so a default request can return 404. WAF proof uses a header-based block rule (403) which is independent of host routing.
-- CloudFront origin is configured as HTTP-only in Terraform (`origin_protocol_policy = "http-only"`) because CloudFront-to-origin HTTPS requires a publicly trusted certificate that matches the configured origin hostname. This repo supports switching to HTTPS-to-origin once that is in place.
-- TLS termination at NGINX Ingress is demonstrated in production-mode via Let’s Encrypt (cert-manager) and in assessment-mode via self-signed TLS on placeholder domains.
-- The post-render apply wrapper enforces `mfe` service type `ClusterIP`; verify with `kubectl -n openedx-prod get svc mfe -o wide`.
-- For real production you would use real DNS + ACM certificates, configure CloudFront alternate domain names that match the Ingress hosts, and switch CloudFront to HTTPS-to-origin.
+| From | To | Port | Purpose |
+|---|---|---:|---|
+| Internet | CloudFront | 443 | viewer traffic |
+| CloudFront | NLB | 80 | origin path (current setting) |
+| Internet | NLB | 443 | direct ingress validation path |
+| NGINX Ingress | LMS/CMS services | 8000 | app routing |
+| Open edX pods | RDS MySQL | 3306 | relational DB |
+| Open edX pods | MongoDB | 27017 | modulestore/content data |
+| Open edX pods | Redis | 6379 | cache/broker |
+| Open edX pods | Elasticsearch | 9200 | search backend |
+| EKS nodes | EFS mount targets | 2049 | shared media RWX |
+
+## Current Hardening Status
+
+Production-style and implemented:
+- Real domain routing
+- Let’s Encrypt certificates via cert-manager
+- NGINX ingress replacing edge Caddy
+- EKS endpoint hardening (private access enabled + public access CIDR restricted)
+- External data layer outside Kubernetes
+- RDS Multi-AZ
+- HPA/probes/observability/backups
+
+Still not fully enterprise-hard (known gaps):
+- Mongo/Redis/Elasticsearch are single EC2 instances
+- CloudFront origin protocol currently `http-only`
+- NAT is single gateway (not highly available)
+
+## Hardening Path (if required)
+
+1. Increase RDS backup retention and automate restore drills.
+2. Move Redis/Elasticsearch to managed multi-AZ services if allowed, or add replication/failover on EC2.
+3. Move CloudFront origin to `https-only` with certificate-hostname alignment.
+4. Use multi-NAT design for AZ fault tolerance.

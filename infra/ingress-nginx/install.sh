@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Installs/upgrades ingress-nginx controller using the pinned chart version and repo values.
+
 NAMESPACE="ingress-nginx"
 RELEASE_NAME="ingress-nginx"
 CHART_VERSION="${CHART_VERSION:-4.14.3}"

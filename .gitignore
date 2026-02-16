@@ -3,6 +3,7 @@
 __pycache__/
 *.pyc
 .DS_Store
+infra/terraform_executable
 
 # Terraform (never commit state or local caches)
 **/.terraform/
@@ -17,3 +18,5 @@ __pycache__/
 # Local assessment docs (keep local, do not commit)
 Assignment.md
 Mandatory Clarifications & Enforcement Criteria.docx
+Assessment.md
+.~lock.*

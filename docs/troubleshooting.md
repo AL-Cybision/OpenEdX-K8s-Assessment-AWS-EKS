@@ -7,7 +7,7 @@ This guide lists the highest-probability failures for this assessment and the fa
 Symptoms:
 - Browser shows 404/502
 - CloudFront default domain returns 404
-- Login redirects to `https://apps.<LMS_HOST>/authn/...` and the browser shows DNS error (assessment-mode only)
+- Login redirects to `https://apps.<LMS_HOST>/authn/...` and browser fails to resolve/route
 
 Checks:
 ```bash
@@ -18,7 +18,7 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -o wide
 
 Notes:
 - Ingress routes by `Host`. If you curl the NLB hostname without a matching `Host` header, NGINX will return 404.
-- The MFE (micro-frontend) login UI uses `apps.<LMS_HOST>`. With placeholder `.local` domains, you must map it locally (for example in `/etc/hosts`).
+- The MFE (micro-frontend) login UI uses `apps.<LMS_HOST>`. Ensure DNS exists for `apps.<LMS_HOST>` and points to the ingress load balancer.
 - If login/register is stuck on `https://apps.<LMS_HOST>/authn/...`, check that LMS/CMS CORS allow `https://apps.<LMS_HOST>` (see `data-layer/tutor/plugins/openedx-mfe-https.py`).
 
 Test directly against the NLB (replace `NLB_HOSTNAME`):

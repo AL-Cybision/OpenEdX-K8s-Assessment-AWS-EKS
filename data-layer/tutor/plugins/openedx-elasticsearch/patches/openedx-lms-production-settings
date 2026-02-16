@@ -1,5 +1,0 @@
-# Enable Elasticsearch as the search backend
-SEARCH_ENGINE = "search.elastic.ElasticSearchEngine"
-# Use URL list format accepted by the Elasticsearch Python client.
-ELASTIC_SEARCH_CONFIG = ["{{ ELASTICSEARCH_HOST }}"]
-ELASTIC_SEARCH_INDEX_PREFIX = "tutor_"

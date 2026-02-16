@@ -13,17 +13,21 @@ Rerun behavior:
 Origin protocol note:
 - This repo uses `origin_protocol_policy = "http-only"` (CloudFront -> origin over HTTP).
 - Reason: HTTPS-to-origin requires a publicly trusted certificate that matches the **origin hostname** CloudFront connects to. By default, this repo uses the ingress LoadBalancer DNS name as the origin, which is not covered by the app TLS certificate.
-- TLS termination at NGINX is demonstrated via direct ingress access to `https://<LMS_HOST>` / `https://<CMS_HOST>` (production-mode: Let’s Encrypt via cert-manager; assessment-mode: self-signed).
+- TLS termination at NGINX is demonstrated via direct ingress access to `https://<LMS_HOST>` / `https://<CMS_HOST>` using Let’s Encrypt via cert-manager.
 - Production hardening: set the CloudFront origin domain name to a real DNS name covered by your certificate (for example `lms.<domain>` pointing to the ingress LoadBalancer), then switch CloudFront to HTTPS-to-origin.
 
 `infra/cloudfront-waf/apply.sh` supports protocol selection:
 ```bash
-# assessment-mode default
+# default
 infra/cloudfront-waf/apply.sh
 
 # hardened mode (requires trusted cert on origin)
-ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
+ORIGIN_DOMAIN_NAME=lms.example.com ORIGIN_PROTOCOL_POLICY=https-only infra/cloudfront-waf/apply.sh
 ```
+
+Safety guard:
+- `apply.sh` blocks `ORIGIN_PROTOCOL_POLICY=https-only` when the origin is still `*.elb.amazonaws.com` because certificate hostname validation will fail.
+- Use a real DNS hostname as origin (`ORIGIN_DOMAIN_NAME=...`) that matches a trusted certificate on NGINX.
 
 Outputs (captured):
 

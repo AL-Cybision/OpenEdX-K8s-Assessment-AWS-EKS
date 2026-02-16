@@ -18,7 +18,9 @@ vpc:
     gateway: Single
   clusterEndpoints:
     publicAccess: true
-    privateAccess: false
+    privateAccess: true
+    publicAccessCIDRs:
+__PUBLIC_ACCESS_CIDRS__
 
 managedNodeGroups:
   - name: ng-main

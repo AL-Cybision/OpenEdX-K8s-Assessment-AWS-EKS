@@ -55,7 +55,7 @@ variable "rds_backup_retention_days" {
 variable "rds_multi_az" {
   description = "Enable Multi-AZ for RDS (higher cost)"
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "rds_skip_final_snapshot" {

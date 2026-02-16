@@ -8,9 +8,12 @@ Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Mei
 
 - `AGENTS.md` (agent/human operating guide: what/why/where/how/when)
 - `docs/README.md`
+- Repo walkthrough (what each folder/script does): `docs/repo-walkthrough.md`
 - External references (upstream docs): `docs/references.md`
 - Research summary (upstream best practices): `docs/upstream-guidance.md`
 - Reproduction runbook: `docs/reproduce.md`
+- Operator quickstart (deploy/verify/pause/resume): `docs/operator-quickstart.md`
+- Cleanup notes (removed legacy files + optional leftovers): `docs/repo-cleanup.md`
 - Operator smoke test (post-deploy verification): `docs/smoke-test.md`
 - Optional: cluster automation: `infra/eksctl/`
 - Configuration artifacts index: `docs/config-artifacts.md`
@@ -27,19 +30,14 @@ Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Mei
 Primary runbook (script-driven):
 - `docs/reproduce.md`
 
-## Access Modes (Production vs Assessment)
+## Access Mode (Production)
 
-Production-mode (recommended):
 - Real DNS hostnames: `lms.<domain>`, `studio.<domain>`, `apps.lms.<domain>`
-- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt (no `/etc/hosts` hacks)
-
-Assessment-mode (fallback if you don't have a domain):
-- Placeholder hostnames: `lms.openedx.local`, `studio.openedx.local`, `apps.lms.openedx.local`
-- Self-signed TLS + local `/etc/hosts` mapping to the ingress LoadBalancer
+- Trusted TLS at NGINX Ingress via cert-manager + Let’s Encrypt
 
 Notes:
 - CloudFront default domain requests may return 404 because NGINX routes by `Host`. The WAF proof (HTTP/2 403 with `X-Block-Me: 1`) is independent of host routing.
-- EKS API endpoint is public for reproducibility; a real production environment should restrict CIDRs or use private endpoint access.
+- EKS API endpoint is hardened: private endpoint enabled and public endpoint restricted by CIDR (`infra/eksctl/harden-endpoint.sh`).
 
 ## Repo Hygiene (Security)
 
@@ -47,14 +45,14 @@ Notes:
 
 High-level execution order:
 1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
-2. Core add-ons (EBS CSI + `gp3` default + metrics-server): `infra/eksctl/install-core-addons.sh`
-3. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
-4. NGINX ingress controller: `infra/ingress-nginx/install.sh`
-5. TLS + ingress host routing (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh`
-6. External data layer (RDS + EC2 DBs): `infra/terraform/apply.sh`
-7. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
-8. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
-9. (Assessment-mode only) Placeholder ingress + self-signed TLS: `k8s/03-ingress/create-selfsigned-tls.sh` then `kubectl apply -f k8s/03-ingress/openedx-ingress.yaml`
+2. (Recommended for existing clusters) Harden endpoint CIDR + private access: `infra/eksctl/harden-endpoint.sh`
+3. Core add-ons (EBS CSI + `gp3` default + metrics-server): `infra/eksctl/install-core-addons.sh`
+4. Namespaces: `kubectl apply -f k8s/00-namespaces/namespaces.yaml`
+5. NGINX ingress controller: `infra/ingress-nginx/install.sh`
+6. TLS + ingress host routing (production-mode): `infra/cert-manager/install.sh` then `k8s/03-ingress/real-domain/apply.sh`
+7. External data layer (RDS Multi-AZ + EC2 DBs): `infra/terraform/apply.sh`
+8. Shared media (EFS RWX) + PVC: `infra/media-efs/apply.sh` then `infra/k8s/02-storage/apply.sh`
+9. Tutor/Open edX deploy: follow `docs/tutor-k8s.md` then apply with `infra/k8s/04-tutor-apply/apply.sh`
 10. HPA + k6 load test: `infra/k8s/05-hpa/apply.sh` then follow `docs/hpa-loadtest.md`
 11. Observability (Prometheus/Grafana + Loki): `infra/observability/install.sh`
 12. CloudFront + WAF: `infra/cloudfront-waf/apply.sh` and `infra/cloudfront-waf/verify.sh`

@@ -242,11 +242,23 @@ Captured result:
 
 ## NGINX Ingress (Replace Caddy)
 
-Apply ingress and create a TLS secret (self-signed for placeholder domains):
+Apply production ingress and trusted TLS (real domain + Let’s Encrypt):
 
 ```bash
-k8s/03-ingress/create-selfsigned-tls.sh
-kubectl apply -f k8s/03-ingress/openedx-ingress.yaml
+infra/cert-manager/install.sh
+
+TUTOR_BIN=".venv/bin/tutor"
+LMS_HOST="$(${TUTOR_BIN} config printvalue LMS_HOST)"
+CMS_HOST="$(${TUTOR_BIN} config printvalue CMS_HOST)"
+MFE_HOST="apps.${LMS_HOST}"
+
+LETSENCRYPT_EMAIL="you@example.com" \
+LMS_HOST="${LMS_HOST}" \
+CMS_HOST="${CMS_HOST}" \
+MFE_HOST="${MFE_HOST}" \
+TLS_SECRET_NAME="openedx-tls" \
+INGRESS_NAME="openedx" \
+  k8s/03-ingress/real-domain/apply.sh
 ```
 
 ## Permanent Caddy Removal (Post-render)

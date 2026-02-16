@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# EC2 user-data bootstrap for external MongoDB with auth enabled.
+# Terraform templates this file and replaces ${...} variables before instance launch.
+
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update -y

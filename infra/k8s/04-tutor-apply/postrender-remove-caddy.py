@@ -14,8 +14,12 @@ DROP_KINDS = {"Deployment", "Service", "ConfigMap", "PersistentVolumeClaim", "Jo
 # by the MFE container image) so the MFE pod can start.
 DROP_NAME_PREFIXES = ("caddy",)
 
-LMS_HOST = os.environ.get("LMS_HOST", "lms.openedx.local")
-CMS_HOST = os.environ.get("CMS_HOST", "studio.openedx.local")
+LMS_HOST = os.environ.get("LMS_HOST")
+CMS_HOST = os.environ.get("CMS_HOST")
+
+if not LMS_HOST or not CMS_HOST:
+    sys.stderr.write("LMS_HOST and CMS_HOST must be set in the environment.\n")
+    sys.exit(2)
 
 PROBE_CONFIG = {
     "lms": {
