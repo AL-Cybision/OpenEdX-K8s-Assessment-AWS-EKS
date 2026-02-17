@@ -6,7 +6,6 @@ Strict data-layer rule: no databases run inside Kubernetes (Tutor's optional Mei
 
 ## Documentation
 
-- `AGENTS.md` (agent/human operating guide: what/why/where/how/when)
 - `docs/README.md`
 - Repo walkthrough (what each folder/script does): `docs/repo-walkthrough.md`
 - External references (upstream docs): `docs/references.md`
