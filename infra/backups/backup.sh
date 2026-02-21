@@ -4,6 +4,7 @@ set -euo pipefail
 # Creates point-in-time backups for external data services and EBS-backed PVC volumes.
 # Scope: RDS snapshot + EC2 volume snapshots + openedx-prod EBS CSI PV snapshots.
 
+# Resolve repo paths and timestamp label used in snapshot names.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 REGION="us-east-1"
@@ -23,6 +24,7 @@ require_cmd kubectl
 require_cmd jq
 
 # --- RDS snapshot ---
+# Resolve RDS instance identifier from Terraform output endpoint.
 RDS_ENDPOINT=$(terraform -chdir="${TF_DIR}" output -raw rds_endpoint)
 DB_ID=$(aws rds describe-db-instances --region ${REGION} \
   --query "DBInstances[?Endpoint.Address=='${RDS_ENDPOINT}'].DBInstanceIdentifier | [0]" \
@@ -41,6 +43,7 @@ aws rds create-db-snapshot \
 echo "RDS snapshot created: ${DB_ID}-${TS}"
 
 # --- EC2 DB snapshots (Mongo/Redis/Elasticsearch) ---
+# For each external EC2 datastore: resolve instance + attached root volume, then snapshot.
 for name in mongo redis elasticsearch; do
   ip=$(terraform -chdir="${TF_DIR}" output -raw "${name}_private_ip")
   instance_id=$(aws ec2 describe-instances --region ${REGION} \
@@ -68,6 +71,7 @@ done
 
 # --- PVC snapshots (EBS CSI volumes for openedx-prod) ---
 # Only snapshot EBS-backed PVs. EFS PVs use a different backup mechanism (AWS Backup).
+# Extract all openedx-prod PV volume handles provisioned by EBS CSI.
 PV_IDS=$(kubectl get pv -o json | jq -r '.items[]
   | select(.spec.claimRef.namespace=="openedx-prod")
   | select(.spec.csi.driver=="ebs.csi.aws.com")

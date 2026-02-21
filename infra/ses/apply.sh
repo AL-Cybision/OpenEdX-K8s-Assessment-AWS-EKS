@@ -8,10 +8,12 @@ set -euo pipefail
 #
 # Result: Open edX continues using EMAIL_HOST=smtp:8025, but Exim relays via SES on 587.
 
+# Target region/namespace and Secrets Manager ID.
 REGION="${REGION:-us-east-1}"
 NAMESPACE="${NAMESPACE:-openedx-prod}"
 SES_SMTP_SECRET_ID="${SES_SMTP_SECRET_ID:-openedx-prod/ses-smtp}"
 
+# Pull SMTP auth material from Secrets Manager (do not print raw secret).
 SECRET_JSON="$(aws secretsmanager get-secret-value --region "${REGION}" --secret-id "${SES_SMTP_SECRET_ID}" --query SecretString --output text | jq -c .)"
 SMTP_USERNAME="$(echo "${SECRET_JSON}" | jq -r '.smtp_username')"
 SMTP_PASSWORD="$(echo "${SECRET_JSON}" | jq -r '.smtp_password')"
@@ -26,6 +28,7 @@ if [[ -n "${FROM_EMAIL}" && "${FROM_EMAIL}" == *"@"* ]]; then
 fi
 SMTP_HELO_HOSTNAME="${SMTP_HELO_HOSTNAME:-${DEFAULT_HELO_HOSTNAME}}"
 
+# Ensure smtp deployment exists before patching.
 kubectl -n "${NAMESPACE}" get deploy smtp >/dev/null
 
 # Export for the YAML generator (keeps secrets out of the terminal output).
@@ -61,6 +64,7 @@ PY
 # - env: SMTP_USERNAME + SMARTHOST
 # - volume mount: /run/secrets/SMTP_PASSWORD (file) for Exim authenticators
 refresh_deploy_json() {
+  # Helper to avoid repeated kubectl command duplication.
   kubectl -n "${NAMESPACE}" get deploy smtp -o json
 }
 
@@ -78,6 +82,7 @@ HAS_VOL="$(echo "${DEPLOY_JSON}" | jq -r '[.spec.template.spec.volumes[]?.name] 
 # Remove any existing ses-smtp mounts (directory or file), then re-add the correct mount.
 MOUNT_INDEXES="$(echo "${DEPLOY_JSON}" | jq -r '.spec.template.spec.containers[0].volumeMounts // [] | to_entries[] | select(.value.name=="ses-smtp") | .key' | sort -nr || true)"
 if [[ -n "${MOUNT_INDEXES}" ]]; then
+  # Remove stale mounts first so reruns converge deterministically.
   PATCH_OPS=()
   while read -r idx; do
     [[ -z "${idx}" ]] && continue
@@ -90,10 +95,12 @@ fi
 HAS_MOUNTS_ARRAY="$(echo "${DEPLOY_JSON}" | jq -r '(.spec.template.spec.containers[0].volumeMounts|type) != "null"')"
 MOUNT_OBJ='{"name":"ses-smtp","mountPath":"/run/secrets/SMTP_PASSWORD","subPath":"SMTP_PASSWORD","readOnly":true}'
 if [[ "${HAS_MOUNTS_ARRAY}" == "true" ]]; then
+  # Append mount if volumeMounts array already exists.
   kubectl -n "${NAMESPACE}" patch deploy smtp --type='json' -p="[
     {\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/volumeMounts/-\",\"value\":${MOUNT_OBJ}}
   ]" >/dev/null
 else
+  # Create volumeMounts array if absent.
   kubectl -n "${NAMESPACE}" patch deploy smtp --type='json' -p="[
     {\"op\":\"add\",\"path\":\"/spec/template/spec/containers/0/volumeMounts\",\"value\":[${MOUNT_OBJ}]}
   ]" >/dev/null
@@ -101,6 +108,7 @@ fi
 DEPLOY_JSON="$(refresh_deploy_json)"
 
 if [[ "${HAS_VOL}" != "true" ]]; then
+  # Add secret-backed volume only when absent.
   HAS_ANY_VOLUMES="$(echo "${DEPLOY_JSON}" | jq -r '(.spec.template.spec.volumes|type) != "null"')"
   if [[ "${HAS_ANY_VOLUMES}" == "true" ]]; then
     kubectl -n "${NAMESPACE}" patch deploy smtp --type='json' -p='[
@@ -113,14 +121,17 @@ if [[ "${HAS_VOL}" != "true" ]]; then
   fi
 fi
 
+# Set non-secret env vars consumed by Exim relay container.
 kubectl -n "${NAMESPACE}" set env deploy/smtp \
   SMTP_USERNAME="${SMTP_USERNAME}" \
   SMARTHOST="${SMARTHOST}" >/dev/null
 
 if [[ -n "${SMTP_HELO_HOSTNAME}" ]]; then
+  # Override HELO hostname when configured (improves SMTP acceptance).
   kubectl -n "${NAMESPACE}" set env deploy/smtp HOSTNAME="${SMTP_HELO_HOSTNAME}" >/dev/null
 fi
 
+# Restart so new env/volume mounts are applied to running pod.
 kubectl -n "${NAMESPACE}" rollout restart deploy/smtp >/dev/null
 kubectl -n "${NAMESPACE}" rollout status deploy/smtp --timeout=180s >/dev/null
 

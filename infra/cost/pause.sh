@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Target cluster/region and default external data-layer identifiers.
 AWS_REGION="${AWS_REGION:-us-east-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 
@@ -24,6 +25,7 @@ require_cmd aws
 
 log "region=${AWS_REGION} cluster=${CLUSTER_NAME}"
 
+# Validate caller identity early to fail fast on credentials issues.
 aws sts get-caller-identity --output json >/dev/null
 
 log "Stopping EC2 data-layer instances (tag:Name starts with ${EC2_NAME_PREFIX}-...)"
@@ -102,6 +104,7 @@ else
 fi
 
 log "Scaling EKS managed nodegroups to 0 (min=0, desired=0)"
+# Retrieve all managed nodegroups and set desired/min to zero for cost pause.
 NODEGROUPS=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$CLUSTER_NAME" --query 'nodegroups' --output text)
 if [[ -z "${NODEGROUPS// /}" ]]; then
   log "No managed nodegroups found (unexpected)."

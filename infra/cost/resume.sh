@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Target cluster/region and default external data-layer identifiers.
 AWS_REGION="${AWS_REGION:-us-east-1}"
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 
@@ -29,6 +30,7 @@ require_cmd aws
 
 log "region=${AWS_REGION} cluster=${CLUSTER_NAME}"
 
+# Validate caller identity early to fail fast on credentials issues.
 aws sts get-caller-identity --output json >/dev/null
 
 if [[ "$START_RDS" == "true" ]]; then
@@ -88,6 +90,7 @@ else
 fi
 
 log "Scaling EKS managed nodegroups (min=${NODEGROUP_MIN}, desired=${NODEGROUP_DESIRED}, max=${NODEGROUP_MAX})"
+# Restore managed nodegroup capacity for workload scheduling.
 NODEGROUPS=$(aws eks list-nodegroups --region "$AWS_REGION" --cluster-name "$CLUSTER_NAME" --query 'nodegroups' --output text)
 if [[ -z "${NODEGROUPS// /}" ]]; then
   log "No managed nodegroups found (unexpected)."

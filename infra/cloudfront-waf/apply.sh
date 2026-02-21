@@ -4,6 +4,7 @@ set -euo pipefail
 # Deploys/updates CloudFront + WAF in front of ingress-nginx.
 # Includes rerun-safe imports when same-named resources already exist in AWS.
 
+# Resolve Terraform module path and verify required CLIs.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 command -v terraform >/dev/null 2>&1 || { echo "terraform not found in PATH" >&2; exit 1; }
 command -v aws >/dev/null 2>&1 || { echo "aws not found in PATH" >&2; exit 1; }
@@ -21,9 +22,11 @@ if [ -z "${LB_HOSTNAME}" ]; then
 fi
 
 if [ -z "${ORIGIN_DOMAIN_NAME}" ]; then
+  # Default origin is the ingress service load balancer hostname.
   ORIGIN_DOMAIN_NAME="${LB_HOSTNAME}"
 fi
 
+# Guardrail: ELB hostnames do not present certificates matching ELB DNS name.
 if [ "${ORIGIN_PROTOCOL_POLICY}" = "https-only" ] && [[ "${ORIGIN_DOMAIN_NAME}" =~ \.elb\..*amazonaws\.com$ ]]; then
   echo "Refusing https-only with ELB hostname origin (${ORIGIN_DOMAIN_NAME})." >&2
   echo "Set ORIGIN_DOMAIN_NAME to a hostname with a trusted certificate (for example lms.yourdomain.com)." >&2
@@ -33,6 +36,7 @@ fi
 echo "Using origin domain: ${ORIGIN_DOMAIN_NAME}"
 echo "Using CloudFront origin protocol policy: ${ORIGIN_PROTOCOL_POLICY}"
 
+# Ensure backend state/providers are initialized.
 terraform -chdir="${SCRIPT_DIR}" init -input=false
 
 # Rerun safety: if local state is missing but same-named resources exist in AWS,
@@ -62,6 +66,7 @@ if ! terraform -chdir="${SCRIPT_DIR}" state list 2>/dev/null | grep -qx "aws_clo
   fi
 fi
 
+# Build and apply a reviewed plan for deterministic updates.
 terraform -chdir="${SCRIPT_DIR}" plan -input=false -out tfplan \
   -var "origin_domain_name=${ORIGIN_DOMAIN_NAME}" \
   -var "origin_protocol_policy=${ORIGIN_PROTOCOL_POLICY}"

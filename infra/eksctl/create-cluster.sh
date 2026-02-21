@@ -4,18 +4,22 @@ set -euo pipefail
 # Creates the EKS cluster from template and updates local kubeconfig.
 # Optionally chains into install-core-addons.sh for mandatory add-ons.
 
+# Resolve helper paths used to render a concrete config from the template.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE="${SCRIPT_DIR}/cluster.yaml"
 
+# Default cluster inputs; override via env for alternate environments.
 CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
 AWS_REGION="${AWS_REGION:-us-east-1}"
 K8S_VERSION="${K8S_VERSION:-1.33}"
 INSTALL_CORE_ADDONS="${INSTALL_CORE_ADDONS:-true}"
 EKS_PUBLIC_ACCESS_CIDRS="${EKS_PUBLIC_ACCESS_CIDRS:-}"
 
+# Temporary rendered config; cleaned on exit.
 TMP_CFG="$(mktemp)"
 trap 'rm -f "${TMP_CFG}"' EXIT
 
+# If CIDRs are not supplied, auto-detect current public IP and use /32 lock-down.
 if [ -z "${EKS_PUBLIC_ACCESS_CIDRS}" ]; then
   DETECTED_PUBLIC_IP="$(curl -fsS --max-time 5 https://checkip.amazonaws.com 2>/dev/null | tr -d '\n' || true)"
   if [[ "${DETECTED_PUBLIC_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -26,6 +30,7 @@ if [ -z "${EKS_PUBLIC_ACCESS_CIDRS}" ]; then
   fi
 fi
 
+# Build the YAML list block expected by cluster.yaml placeholder.
 CIDR_BLOCK=""
 IFS=',' read -r -a CIDR_LIST <<< "${EKS_PUBLIC_ACCESS_CIDRS}"
 for CIDR in "${CIDR_LIST[@]}"; do
@@ -41,6 +46,7 @@ if [ -z "${CIDR_BLOCK}" ]; then
   exit 1
 fi
 
+# Render final eksctl config from template placeholders.
 sed -e "s/__CLUSTER_NAME__/${CLUSTER_NAME}/g" \
     -e "s/__AWS_REGION__/${AWS_REGION}/g" \
     -e "s/__K8S_VERSION__/${K8S_VERSION}/g" \
@@ -57,11 +63,14 @@ sed -e "s/__CLUSTER_NAME__/${CLUSTER_NAME}/g" \
 
 echo "Using EKS public endpoint CIDRs: ${EKS_PUBLIC_ACCESS_CIDRS}"
 
+# Create control plane + nodegroup + default addons.
 eksctl create cluster -f "${TMP_CFG}"
 
+# Refresh kubeconfig and verify kubectl connectivity.
 aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}" >/dev/null
 kubectl get ns >/dev/null
 
+# Optionally chain required storage/metrics baseline addons.
 if [ "${INSTALL_CORE_ADDONS}" = "true" ]; then
   "${SCRIPT_DIR}/install-core-addons.sh"
 fi

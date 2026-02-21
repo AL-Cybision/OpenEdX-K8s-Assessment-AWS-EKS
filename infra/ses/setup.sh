@@ -10,6 +10,7 @@ set -euo pipefail
 # - If `ProductionAccessEnabled=false`, SES can only send to verified identities.
 #   You can still verify your own email for activation testing.
 
+# Default SES/domain/identity settings; override via env for your domain.
 REGION="${REGION:-us-east-1}"
 SES_DOMAIN="${SES_DOMAIN:-syncummah.com}"
 FROM_EMAIL="${FROM_EMAIL:-no-reply@${SES_DOMAIN}}"
@@ -20,8 +21,10 @@ SECRETS_NAME="${SECRETS_NAME:-openedx-prod/ses-smtp}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Validate caller credentials early.
 aws sts get-caller-identity --output json >/dev/null
 
+# Print SES account mode so operator understands sandbox constraints.
 ACCOUNT_JSON="$(aws sesv2 get-account --region "${REGION}" --output json)"
 PROD_ACCESS="$(echo "${ACCOUNT_JSON}" | jq -r '.ProductionAccessEnabled')"
 echo "SES ProductionAccessEnabled=${PROD_ACCESS} (region ${REGION})"
@@ -46,6 +49,7 @@ DKIM_STATUS="$(echo "${DOMAIN_JSON}" | jq -r '.DkimAttributes.Status')"
 echo "SES domain identity: ${SES_DOMAIN} VerifiedForSendingStatus=${DOMAIN_STATUS} DKIM=${DKIM_STATUS}"
 
 if [[ "${DKIM_STATUS}" != "SUCCESS" ]]; then
+  # Output DNS CNAMEs required for DKIM validation.
   echo
   echo "DNS: add these DKIM CNAME records for ${SES_DOMAIN}:"
   echo "${DOMAIN_JSON}" | jq -r '.DkimAttributes.Tokens[]' | while read -r tok; do
@@ -54,6 +58,7 @@ if [[ "${DKIM_STATUS}" != "SUCCESS" ]]; then
 fi
 
 if [[ "${DOMAIN_STATUS}" != "true" ]]; then
+  # Output DNS TXT required for domain identity verification.
   echo
   echo "DNS: add SES verification TXT record for ${SES_DOMAIN}:"
   aws ses get-identity-verification-attributes --region "${REGION}" --identities "${SES_DOMAIN}" --output json | \
@@ -61,6 +66,7 @@ if [[ "${DOMAIN_STATUS}" != "true" ]]; then
 fi
 
 if ! aws iam get-user --user-name "${IAM_USER_NAME}" >/dev/null 2>&1; then
+  # Create dedicated SMTP IAM user if it does not exist yet.
   aws iam create-user --user-name "${IAM_USER_NAME}" >/dev/null
 fi
 
@@ -103,9 +109,11 @@ SECRET_PAYLOAD="$(jq -n \
   '{smtp_username:$smtp_username,smtp_password:$smtp_password,smtp_host:$smtp_host,smtp_port:$smtp_port,smarthost:$smarthost,from_email:$from_email}')"
 
 if aws secretsmanager describe-secret --region "${REGION}" --secret-id "${SECRETS_NAME}" >/dev/null 2>&1; then
+  # Rotate secret value in place when secret already exists.
   aws secretsmanager put-secret-value --region "${REGION}" --secret-id "${SECRETS_NAME}" --secret-string "${SECRET_PAYLOAD}" >/dev/null
   SECRET_ARN="$(aws secretsmanager describe-secret --region "${REGION}" --secret-id "${SECRETS_NAME}" --query ARN --output text)"
 else
+  # Create secret first time and capture its ARN for apply step.
   SECRET_ARN="$(aws secretsmanager create-secret --region "${REGION}" --name "${SECRETS_NAME}" --secret-string "${SECRET_PAYLOAD}" --query ARN --output text)"
 fi
 echo

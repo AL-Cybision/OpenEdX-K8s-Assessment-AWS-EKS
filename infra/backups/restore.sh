@@ -4,6 +4,7 @@ set -euo pipefail
 # Controlled restore helper (dry-run by default) for RDS and EBS snapshots.
 # Set CONFIRM_RESTORE=YES to execute restore actions.
 
+# Global defaults used by both restore modes.
 REGION="${AWS_REGION:-us-east-1}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TS="$(date +%Y%m%d-%H%M%S)"
@@ -44,6 +45,7 @@ require_cmd aws
 require_cmd jq
 
 confirm_or_print() {
+  # Safety guard: require explicit opt-in before creating restore resources.
   if [ "${CONFIRM_RESTORE:-}" != "YES" ]; then
     echo "Dry run only (no resources created)."
     echo "Set CONFIRM_RESTORE=YES to execute."
@@ -57,6 +59,7 @@ shift || true
 
 case "${cmd}" in
   rds)
+    # Restore a new DB instance from a manual snapshot.
     DB_ID="${DB_ID:-}"
     if [ -z "${DB_ID}" ]; then
       # Best-effort discovery via Terraform output (requires state).
@@ -75,6 +78,7 @@ case "${cmd}" in
 
     SNAPSHOT_ID="${SNAPSHOT_ID:-}"
     if [ -z "${SNAPSHOT_ID}" ]; then
+      # Auto-select the latest manual snapshot for this source DB.
       SNAPSHOT_ID="$(aws rds describe-db-snapshots --region "${REGION}" \
         --db-instance-identifier "${DB_ID}" \
         --snapshot-type manual \
@@ -145,6 +149,7 @@ case "${cmd}" in
     ;;
 
   ebs-volume)
+    # Create an EBS volume from a provided snapshot in a target AZ.
     SNAP_ID="${1:-}"
     AZ="${2:-}"
     if [ -z "${SNAP_ID}" ] || [ -z "${AZ}" ]; then

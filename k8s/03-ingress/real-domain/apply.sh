@@ -17,6 +17,7 @@ set -euo pipefail
 NAMESPACE="${NAMESPACE:-openedx-prod}"
 INGRESS_CLASS="${INGRESS_CLASS:-nginx}"
 
+# Fail fast when mandatory host/email parameters are missing.
 : "${LETSENCRYPT_EMAIL:?Set LETSENCRYPT_EMAIL (used for ACME registration)}"
 : "${LMS_HOST:?Set LMS_HOST (e.g. lms.example.com)}"
 : "${CMS_HOST:?Set CMS_HOST (e.g. studio.example.com)}"
@@ -30,6 +31,7 @@ CERT_NAME="${CERT_NAME:-${TLS_SECRET_NAME}}"
 INGRESS_NAME="${INGRESS_NAME:-openedx-real}"
 
 # 1) ClusterIssuer (cluster-scoped)
+# Registers ACME account and HTTP-01 challenge solver via ingress-nginx.
 kubectl apply -f - <<YAML
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -48,6 +50,7 @@ spec:
 YAML
 
 # 2) Certificate (namespaced) -> generates a TLS secret
+# Requests a certificate covering LMS/CMS/MFE hostnames.
 kubectl -n "${NAMESPACE}" apply -f - <<YAML
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -67,6 +70,7 @@ YAML
 kubectl -n "${NAMESPACE}" wait --for=condition=Ready "certificate/${CERT_NAME}" --timeout=15m
 
 # 3) Ingress with host routing + TLS
+# Applies host-based routing for LMS/CMS/MFE behind the same ingress controller.
 kubectl -n "${NAMESPACE}" apply -f - <<YAML
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -124,4 +128,3 @@ echo "Applied:"
 echo "- ClusterIssuer/${ISSUER_NAME}"
 echo "- Certificate/${CERT_NAME} (secret=${TLS_SECRET_NAME}) in namespace ${NAMESPACE}"
 echo "- Ingress/${INGRESS_NAME} in namespace ${NAMESPACE}"
-

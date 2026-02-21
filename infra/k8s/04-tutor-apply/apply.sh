@@ -4,6 +4,7 @@ set -euo pipefail
 # Wrapper to apply Tutor k8s manifests and permanently remove Caddy resources
 # while keeping NGINX ingress as the edge proxy.
 
+# Default binary/paths/namespace values. Override via env if needed.
 TUTOR_BIN="${TUTOR_BIN:-.venv/bin/tutor}"
 NAMESPACE="${NAMESPACE:-openedx-prod}"
 TUTOR_ENV_DIR="${TUTOR_ENV_DIR:-${HOME}/.local/share/tutor/env}"
@@ -46,6 +47,7 @@ cp -f "${REPO_ROOT}/data-layer/tutor/plugins/openedx-elasticsearch.py" "${TUTOR_
 # We terminate TLS at NGINX Ingress; Open edX must behave as HTTPS behind a proxy.
 "${TUTOR_BIN}" config save -s LMS_HOST="${LMS_HOST}" -s CMS_HOST="${CMS_HOST}" -s ENABLE_HTTPS=true >/dev/null
 
+# Render environment files so kubectl kustomize uses current Tutor config.
 "${TUTOR_BIN}" config save --env-only
 
 # Render manifests via kustomize, remove Caddy resources and Jobs/Namespaces,
