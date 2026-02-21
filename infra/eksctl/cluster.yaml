@@ -19,7 +19,7 @@ vpc:
   clusterEndpoints:
     publicAccess: true
     privateAccess: true
-    publicAccessCIDRs:
+  publicAccessCIDRs:
 __PUBLIC_ACCESS_CIDRS__
 
 managedNodeGroups:
