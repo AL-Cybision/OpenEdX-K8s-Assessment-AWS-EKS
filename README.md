@@ -38,10 +38,6 @@ Notes:
 - CloudFront default domain requests may return 404 because NGINX routes by `Host`. The WAF proof (HTTP/2 403 with `X-Block-Me: 1`) is independent of host routing.
 - EKS API endpoint is hardened: private endpoint enabled and public endpoint restricted by CIDR (`infra/eksctl/harden-endpoint.sh`).
 
-## Repo Hygiene (Security)
-
-- Terraform state/plan files (for example `infra/**/terraform.tfstate`, `infra/**/tfplan`) are generated locally and contain secrets. They are `.gitignore`'d; do not commit or share a raw folder copy. Use `git clone` of the repo for sharing.
-
 High-level execution order:
 1. (Optional) Create EKS cluster: `infra/eksctl/create-cluster.sh`
 2. (Recommended for existing clusters) Harden endpoint CIDR + private access: `infra/eksctl/harden-endpoint.sh`
