@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Applies Open edX-specific PrometheusRule alerts in observability namespace.
-
-# Create/update alert rule CRD object.
-kubectl apply -f infra/observability/openedx-prometheusrule.yaml
-# Confirm the rule object is present after apply.
-kubectl -n observability get prometheusrule openedx-prod-rules
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+echo "[compat] Deprecated path: infra/observability/apply-alerts.sh" >&2
+echo "[compat] Use: scripts/51-observability-install.sh" >&2
+exec "${REPO_ROOT}/scripts/51-observability-install.sh" "$@"

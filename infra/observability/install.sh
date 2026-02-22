@@ -1,30 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Installs/updates observability stack (kube-prometheus-stack + loki-stack).
-
-# Namespace and values file paths for both Helm releases.
-NAMESPACE="observability"
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-
-VALUES_KPS="${REPO_ROOT}/infra/observability/values-kube-prometheus-stack.yaml"
-VALUES_LOKI="${REPO_ROOT}/infra/observability/values-loki-stack.yaml"
-
-# Register/update chart repositories.
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm repo add grafana https://grafana.github.io/helm-charts
-helm repo update
-
-# Install/upgrade metrics/alerts stack (Prometheus, Alertmanager, Grafana, exporters).
-helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
-  -n "${NAMESPACE}" --create-namespace \
-  -f "${VALUES_KPS}" \
-  --wait --timeout 10m
-
-# Install/upgrade Loki + promtail log collection stack.
-helm upgrade --install loki-stack grafana/loki-stack \
-  -n "${NAMESPACE}" \
-  -f "${VALUES_LOKI}" \
-  --wait --timeout 10m
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+echo "[compat] Deprecated path: infra/observability/install.sh" >&2
+echo "[compat] Use: scripts/51-observability-install.sh" >&2
+exec "${REPO_ROOT}/scripts/51-observability-install.sh" "$@"

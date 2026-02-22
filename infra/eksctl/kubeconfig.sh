@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Refreshes local kubeconfig context for the target EKS cluster.
-
-# Target cluster identity (override via env as needed).
-CLUSTER_NAME="${CLUSTER_NAME:-openedx-eks}"
-AWS_REGION="${AWS_REGION:-us-east-1}"
-
-# Merge/refresh kubeconfig entry so kubectl can talk to this cluster.
-aws eks update-kubeconfig --name "${CLUSTER_NAME}" --region "${AWS_REGION}"
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+echo "[compat] Deprecated path: infra/eksctl/kubeconfig.sh" >&2
+echo "[compat] Use: scripts/13-eks-kubeconfig.sh" >&2
+exec "${REPO_ROOT}/scripts/13-eks-kubeconfig.sh" "$@"

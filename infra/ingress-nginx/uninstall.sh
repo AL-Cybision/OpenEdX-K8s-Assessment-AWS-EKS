@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Removes ingress-nginx Helm release from ingress-nginx namespace.
-
-# Best-effort uninstall to keep script idempotent during repeated cleanup.
-helm -n ingress-nginx uninstall ingress-nginx || true
+REPO_ROOT="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+echo "[compat] Deprecated path: infra/ingress-nginx/uninstall.sh" >&2
+echo "[compat] Use: scripts/22-ingress-nginx-uninstall.sh" >&2
+exec "${REPO_ROOT}/scripts/22-ingress-nginx-uninstall.sh" "$@"

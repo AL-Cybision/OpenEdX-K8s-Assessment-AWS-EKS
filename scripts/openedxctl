@@ -1,0 +1,146 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+usage() {
+  cat <<USAGE
+Usage:
+  scripts/openedxctl deploy
+  scripts/openedxctl verify
+  scripts/openedxctl pause
+  scripts/openedxctl resume
+  scripts/openedxctl destroy
+  scripts/openedxctl phase <number>
+
+Phases:
+  00 preflight
+  10 eks-create
+  11 eks-harden-endpoint
+  12 eks-core-addons
+  20 namespaces-apply
+  21 ingress-nginx-install
+  23 cert-manager-install
+  30 data-layer-apply
+  31 media-efs-apply
+  32 storage-apply
+  40 openedx-apply
+  41 real-domain-ingress-apply
+  50 hpa-apply
+  51 observability-install
+  52 cloudfront-waf-apply
+  53 cloudfront-waf-verify
+  60 backup-run
+  90 cost-pause
+  91 cost-resume
+  97 data-layer-destroy
+  98 eks-delete
+  99 destroy-all
+USAGE
+}
+
+run_phase() {
+  local phase="$1"
+  local script
+  script="$(ls "${SCRIPT_DIR}/${phase}"-*.sh 2>/dev/null | head -n1 || true)"
+  if [[ -z "${script}" ]]; then
+    echo "Unknown phase: ${phase}" >&2
+    exit 2
+  fi
+  echo "[openedxctl] running ${script#${REPO_ROOT}/}"
+  "${script}"
+}
+
+verify_db_connectivity() {
+  local tf_dir="${REPO_ROOT}/configs/terraform/data-layer"
+  local rds_endpoint mongo_ip redis_ip es_ip
+
+  # Ensure providers are available when running from a clean clone.
+  terraform -chdir="${tf_dir}" init -input=false >/dev/null
+  terraform -chdir="${tf_dir}" output
+
+  rds_endpoint="$(terraform -chdir="${tf_dir}" output -raw rds_endpoint)"
+  mongo_ip="$(terraform -chdir="${tf_dir}" output -raw mongo_private_ip)"
+  redis_ip="$(terraform -chdir="${tf_dir}" output -raw redis_private_ip)"
+  es_ip="$(terraform -chdir="${tf_dir}" output -raw elasticsearch_private_ip)"
+
+  cleanup_verify_net() {
+    kubectl -n openedx-prod delete pod verify-net --ignore-not-found >/dev/null 2>&1 || true
+  }
+
+  cleanup_verify_net
+  trap cleanup_verify_net RETURN
+  kubectl -n openedx-prod run verify-net --restart=Never --image=busybox:1.36 --command -- sh -c 'sleep 300'
+  kubectl -n openedx-prod wait --for=condition=Ready pod/verify-net --timeout=120s
+
+  # Validate in-cluster reachability to external services.
+  kubectl -n openedx-prod exec verify-net -- sh -c \
+    "nc -zvw3 ${rds_endpoint} 3306 && nc -zvw3 ${mongo_ip} 27017 && nc -zvw3 ${redis_ip} 6379 && nc -zvw3 ${es_ip} 9200"
+
+  cleanup_verify_net
+}
+
+verify() {
+  local hosts lms_host cms_host mfe_host
+
+  kubectl -n openedx-prod get pods
+  kubectl -n openedx-prod get ingress openedx
+  kubectl -n openedx-prod get certificate openedx-tls
+  kubectl -n openedx-prod get hpa
+  verify_db_connectivity
+
+  hosts="$(kubectl -n openedx-prod get ingress openedx -o jsonpath='{range .spec.rules[*]}{.host}{"\n"}{end}')"
+  lms_host="$(printf '%s\n' "${hosts}" | grep -E '^lms\.' | head -n1 || true)"
+  cms_host="$(printf '%s\n' "${hosts}" | grep -E '^studio\.' | head -n1 || true)"
+  mfe_host="$(printf '%s\n' "${hosts}" | grep -E '^apps\.' | head -n1 || true)"
+
+  [[ -n "${lms_host}" ]] && curl -fsSI "https://${lms_host}/heartbeat" >/dev/null
+  [[ -n "${cms_host}" ]] && curl -fsSI "https://${cms_host}/heartbeat" >/dev/null
+  [[ -n "${mfe_host}" ]] && curl -fsSI "https://${mfe_host}/authn/login" >/dev/null
+
+  "${SCRIPT_DIR}/53-cloudfront-waf-verify.sh"
+  kubectl -n observability get pods
+}
+
+cmd="${1:-}"
+case "${cmd}" in
+  deploy)
+    if aws eks describe-cluster --name "${CLUSTER_NAME:-openedx-eks}" --region "${AWS_REGION:-us-east-1}" >/dev/null 2>&1; then
+      run_phase 11
+      run_phase 12
+    else
+      run_phase 10
+    fi
+    run_phase 20
+    run_phase 21
+    run_phase 30
+    run_phase 31
+    run_phase 32
+    run_phase 40
+    run_phase 23
+    run_phase 41
+    run_phase 50
+    run_phase 51
+    run_phase 52
+    ;;
+  verify)
+    verify
+    ;;
+  pause)
+    run_phase 90
+    ;;
+  resume)
+    run_phase 91
+    ;;
+  destroy)
+    run_phase 99
+    ;;
+  phase)
+    run_phase "${2:-}"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac
