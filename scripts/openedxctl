@@ -81,6 +81,61 @@ verify_db_connectivity() {
   cleanup_verify_net
 }
 
+verify_studio_sso_and_search() {
+  local lms_python cms_python
+  lms_python='cd /openedx/edx-platform && /openedx/venv/bin/python manage.py lms shell'
+  cms_python='cd /openedx/edx-platform && /openedx/venv/bin/python manage.py cms shell'
+
+  # Ensure Studio OAuth app exists and has required scopes.
+  kubectl -n openedx-prod exec deploy/lms -c lms -- sh -lc "${lms_python} <<'PY'
+from oauth2_provider.models import Application
+from openedx.core.djangoapps.oauth_dispatch.models import ApplicationAccess
+
+app = Application.objects.filter(client_id='cms-sso').first()
+if app is None:
+    raise SystemExit('Missing oauth application: cms-sso')
+
+access = ApplicationAccess.objects.filter(application=app).first()
+if access is None:
+    raise SystemExit('Missing ApplicationAccess for cms-sso')
+
+required = {'user_id', 'profile', 'email'}
+scopes = set(access.scopes or [])
+missing = required - scopes
+if missing:
+    raise SystemExit(f'cms-sso missing scopes: {sorted(missing)}')
+
+print('OK cms-sso scopes:', sorted(scopes))
+PY"
+
+  # Ensure CMS search backend points to external Elasticsearch (not localhost).
+  kubectl -n openedx-prod exec deploy/cms -c cms -- sh -lc "${cms_python} <<'PY'
+from django.conf import settings
+
+cfg = settings.ELASTIC_SEARCH_CONFIG
+raw = str(cfg)
+if 'localhost:9200' in raw or '127.0.0.1:9200' in raw:
+    raise SystemExit(f'ELASTIC_SEARCH_CONFIG still local: {cfg}')
+
+print('OK ELASTIC_SEARCH_CONFIG:', cfg)
+PY"
+
+  # Reindex smoke check to catch runtime Elasticsearch wiring issues.
+  kubectl -n openedx-prod exec deploy/cms -c cms -- sh -lc "${cms_python} <<'PY'
+from xmodule.modulestore.django import modulestore
+from cms.djangoapps.contentstore.courseware_index import CoursewareSearchIndexer
+
+courses = list(modulestore().get_courses())
+if not courses:
+    print('SKIP reindex smoke: no courses in modulestore')
+    raise SystemExit(0)
+
+course_key = courses[0].id
+indexed = CoursewareSearchIndexer.do_course_reindex(modulestore(), course_key)
+print(f'OK reindex smoke: {course_key} indexed={indexed}')
+PY"
+}
+
 verify() {
   local hosts lms_host cms_host mfe_host
 
@@ -98,6 +153,8 @@ verify() {
   [[ -n "${lms_host}" ]] && curl -fsSI "https://${lms_host}/heartbeat" >/dev/null
   [[ -n "${cms_host}" ]] && curl -fsSI "https://${cms_host}/heartbeat" >/dev/null
   [[ -n "${mfe_host}" ]] && curl -fsSI "https://${mfe_host}/authn/login" >/dev/null
+
+  verify_studio_sso_and_search
 
   "${SCRIPT_DIR}/53-cloudfront-waf-verify.sh"
   kubectl -n observability get pods

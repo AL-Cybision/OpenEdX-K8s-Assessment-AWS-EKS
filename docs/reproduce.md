@@ -172,6 +172,7 @@ scripts/60-backup-run.sh
 ## 10) Verification Bundle
 
 ```bash
+scripts/openedxctl verify
 kubectl -n openedx-prod get pods
 kubectl -n openedx-prod get ingress openedx
 kubectl -n openedx-prod get hpa
@@ -179,6 +180,13 @@ terraform -chdir=configs/terraform/data-layer output
 scripts/53-cloudfront-waf-verify.sh
 kubectl -n observability get pods
 ```
+
+`scripts/openedxctl verify` includes fail-fast checks for:
+- LMS/CMS/MFE HTTPS endpoints
+- in-cluster DB reachability
+- Studio SSO bootstrap (`cms-sso` OAuth app + required scopes)
+- Studio search backend wiring + reindex smoke test
+- CloudFront/WAF block verification
 
 Data-layer connectivity from inside cluster:
 
@@ -193,6 +201,23 @@ kubectl -n openedx-prod run verify-net --restart=Never --image=busybox:1.36 --co
 kubectl -n openedx-prod wait --for=condition=Ready pod/verify-net --timeout=120s
 kubectl -n openedx-prod exec verify-net -- sh -c "nc -zvw3 ${RDS_ENDPOINT} 3306 && nc -zvw3 ${MONGO_IP} 27017 && nc -zvw3 ${REDIS_IP} 6379 && nc -zvw3 ${ES_IP} 9200"
 kubectl -n openedx-prod delete pod verify-net
+```
+
+## 11) Demo-Safe Precheck (Before Live Session)
+
+Run this exactly before the demo call:
+
+```bash
+scripts/openedxctl verify
+kubectl -n openedx-prod get deploy cms lms -o wide
+kubectl -n openedx-prod get hpa
+```
+
+If `cms` has Pending replicas due temporary capacity pressure:
+
+```bash
+kubectl -n openedx-prod scale deploy/cms --replicas=2
+kubectl -n openedx-prod rollout status deploy/cms --timeout=300s
 ```
 
 ## Cost Control

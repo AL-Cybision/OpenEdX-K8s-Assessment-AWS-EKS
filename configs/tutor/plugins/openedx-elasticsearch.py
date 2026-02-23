@@ -10,7 +10,9 @@ LMS_PATCH = """\
 # Enable Elasticsearch as the search backend
 MEILISEARCH_ENABLED = False
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
+# elasticsearch-py expects either URL strings or host/port dicts; using the
+# wrong nested {"hosts":[...]} shape silently falls back to localhost:9200.
+ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
 
 # Keep MFE runtime config aligned (MFEs may read this from /api/mfe_config).
@@ -21,7 +23,7 @@ CMS_PATCH = """\
 # Enable Elasticsearch as the search backend
 MEILISEARCH_ENABLED = False
 SEARCH_ENGINE = \"search.elastic.ElasticSearchEngine\"
-ELASTIC_SEARCH_CONFIG = [{\"hosts\": [\"{{ ELASTICSEARCH_HOST }}\"]}]
+ELASTIC_SEARCH_CONFIG = [\"{{ ELASTICSEARCH_HOST }}\"]
 ELASTIC_SEARCH_INDEX_PREFIX = \"tutor_\"
 """
 
