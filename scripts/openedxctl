@@ -9,6 +9,7 @@ usage() {
 Usage:
   scripts/openedxctl deploy
   scripts/openedxctl verify
+  scripts/openedxctl demo-gate [--skip-hpa] [--skip-backup] [--readonly]
   scripts/openedxctl pause
   scripts/openedxctl resume
   scripts/openedxctl destroy
@@ -31,6 +32,7 @@ Phases:
   51 observability-install
   52 cloudfront-waf-apply
   53 cloudfront-waf-verify
+  54 demo-gate
   60 backup-run
   90 cost-pause
   91 cost-resume
@@ -183,6 +185,9 @@ case "${cmd}" in
     ;;
   verify)
     verify
+    ;;
+  demo-gate)
+    "${SCRIPT_DIR}/54-demo-gate.sh" "${@:2}"
     ;;
   pause)
     run_phase 90

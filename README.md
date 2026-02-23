@@ -39,6 +39,7 @@ Use `scripts/openedxctl` for all major actions:
 ```bash
 scripts/openedxctl deploy
 scripts/openedxctl verify
+scripts/openedxctl demo-gate
 scripts/openedxctl pause
 scripts/openedxctl resume
 ```
@@ -59,6 +60,7 @@ Legacy paths under `infra/...` and `k8s/...` are kept as wrappers for one compat
 Full reproducible process:
 
 - `docs/reproduce.md`
+- `docs/demo-checklist.md`
 
 Architecture decisions and implementation rationale:
 
@@ -93,6 +95,22 @@ Architecture decisions and implementation rationale:
 ![](evidence/screenshots/waf-block-403.png)
 
 ## Demo Checklist (Live Review)
+
+Single-command demo readiness gate:
+
+```bash
+cp -n configs/demo/demo.env.example .env.demo.local
+# edit .env.demo.local
+scripts/openedxctl demo-gate --skip-backup
+```
+
+Artifacts:
+
+```text
+artifacts/demo-gate/<UTC_TS>/{summary.md,raw.log,json-summary.json}
+```
+
+Core command set (manual view):
 
 ```bash
 kubectl -n openedx-prod get pods

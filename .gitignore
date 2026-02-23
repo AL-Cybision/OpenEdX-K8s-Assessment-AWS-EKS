@@ -21,3 +21,7 @@ Mandatory Clarifications & Enforcement Criteria.docx
 Assessment.md
 .~lock.*
 AGENTS.md
+
+# Demo gate local runtime files
+.env.demo.local
+artifacts/demo-gate/

@@ -220,6 +220,40 @@ kubectl -n openedx-prod scale deploy/cms --replicas=2
 kubectl -n openedx-prod rollout status deploy/cms --timeout=300s
 ```
 
+## 12) Demo Gate (Single End-to-End Validation)
+
+Prepare local demo credentials file:
+
+```bash
+cp -n configs/demo/demo.env.example .env.demo.local
+# edit .env.demo.local with your real demo accounts/passwords
+```
+
+Run full controlled validation (includes account/course setup, persistence drill,
+HPA drill, backup drill):
+
+```bash
+scripts/openedxctl demo-gate
+```
+
+Fast variant:
+
+```bash
+scripts/openedxctl demo-gate --skip-backup
+```
+
+Non-mutating variant:
+
+```bash
+scripts/openedxctl demo-gate --readonly --skip-hpa --skip-backup
+```
+
+Artifacts are generated under:
+
+```text
+artifacts/demo-gate/<UTC_TS>/
+```
+
 ## Cost Control
 
 ```bash
